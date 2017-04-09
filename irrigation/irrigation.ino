@@ -84,12 +84,12 @@ void setup() {
 
 void loop() {
   //Serial.print();
-  /*for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
+  for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     Serial.println("Sensor " + (String) numSensor + ": " + 
                                (String) readTemp(SENSOR_TEMP_START_PIN + numSensor) + " C " + 
                                "(sTh: " + (String) lines[numSensor].tempStartThr + " / " + (String) lines[numSensor].tempStopThr + ") -> " + 
                                (String) digitalRead(IRRIGATION_START_PIN + numSensor));
-  }*/
+  }
   updateLines();
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
@@ -129,8 +129,19 @@ void updateLines() {
 
 // Set the start conditions to activate a irrigation line
 void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
-  Serial.println("START COMMAND");
-  Serial.println((String) tempValue);
+  lines[numSensor].tempStartOp = tempOp;
+  lines[numSensor].tempStartThr = tempValue;
+  lines[numSensor].humStartOp = humOp;
+  lines[numSensor].humStartThr = humValue;
+
+  // if the the line wans't previously configured init stop conditions to the start ones
+  if(!lines[numSensor].configured) {
+    lines[numSensor].tempStopOp = tempOp;
+    lines[numSensor].tempStopThr = tempValue;
+    lines[numSensor].humStopOp = humOp;
+    lines[numSensor].humStopThr = humValue;
+    lines[numSensor].configured = true;
+  }
 }
 
 // Set the stop conditions to activate a irrigation line
@@ -178,7 +189,7 @@ void serialEvent() {
   if(numFrag == 6 && cmd == CMD_SET_INIT) {
       setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
   } else if(numFrag == 6 && cmd == CMD_SET_STOP) {
-    setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
+    setStopCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
   } else if(numFrag == 1 && cmd == CMD_REQUEST) {
     sendCommands();
   }
