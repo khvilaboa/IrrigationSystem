@@ -7,11 +7,20 @@ const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 const int NUM_LINES = 2;
 const int REFRESH_TIME = 2000;
 
+const char SERIAL_DELIM = ';';
+const char SERIAL_MAX_FRAGS = 6;
+
+const char CMD_SET_INIT = 'I';
+const char CMD_SET_STOP = 'S';
+const char CMD_REQUEST = 'R';
+
 // ----------------------------
 
 // Each line has NUM_SENSORS sensors (temp, humidity...)
 //float startThresholds[NUM_LINES][NUM_SENSORS] = {{22.5, 0}, {22.5, 0}};
 //float stopThresholds[NUM_LINES][NUM_SENSORS] = {{22, 0}, {22, 0}};
+
+String inputString = "";
 
 struct irrigationLine {
   bool configured;
@@ -39,6 +48,10 @@ struct irrigationLine {
 float readTemp(int sensor);
 void updateLines();
 
+void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
+void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
+void sendCommands();
+
 // -------------------------------------------------------------
 
 void setup() {
@@ -53,6 +66,8 @@ void setup() {
     pinMode(IRRIGATION_START_PIN + numSensor, OUTPUT);
     digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
   }
+
+  inputString.reserve(100);
 
   // Fixed config for test 
   lines[0].configured = true;
@@ -69,12 +84,12 @@ void setup() {
 
 void loop() {
   //Serial.print();
-  for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
+  /*for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     Serial.println("Sensor " + (String) numSensor + ": " + 
                                (String) readTemp(SENSOR_TEMP_START_PIN + numSensor) + " C " + 
                                "(sTh: " + (String) lines[numSensor].tempStartThr + " / " + (String) lines[numSensor].tempStopThr + ") -> " + 
                                (String) digitalRead(IRRIGATION_START_PIN + numSensor));
-  }
+  }*/
   updateLines();
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
@@ -99,7 +114,7 @@ void updateLines() {
   // Check conditions
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     if(!lines[numSensor].configured) break;
-    Serial.println("Checking line " + (String) numSensor + "...");
+    //Serial.println("Checking line " + (String) numSensor + "...");
 
     currentTemp = readTemp(SENSOR_TEMP_START_PIN + numSensor);
     
@@ -109,7 +124,63 @@ void updateLines() {
     } else if(currentTemp < lines[numSensor].tempStopThr) { // Stop condition
       digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
     }
-  }
+  } 
+}
+
+// Set the start conditions to activate a irrigation line
+void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
+  Serial.println("START COMMAND");
+  Serial.println((String) tempValue);
+}
+
+// Set the stop conditions to activate a irrigation line
+void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
   
+}
+
+// Send all the commands via serial
+void sendCommands() {
+  
+}
+
+// -------------------------------------------------------------
+
+// Function called when a serial message arrive
+void serialEvent() {
+  char inChar, cmd; 
+  String frags[SERIAL_MAX_FRAGS];
+  int numFrag = 0;
+  
+  while (Serial.available()) {
+    inChar = (char) Serial.read();
+    
+    if (inChar == SERIAL_DELIM) {
+      //Serial.println(inputString);
+      frags[numFrag++] = inputString;
+      inputString = "";
+      
+      if(numFrag == SERIAL_MAX_FRAGS) {
+        break;
+      }
+    } else {
+      inputString += inChar;
+    }
+  }
+
+  if(numFrag < SERIAL_MAX_FRAGS && inputString != "") {
+    frags[numFrag++] = inputString;
+  }
+
+  inputString = "";
+  if(frags[0] == "") return;
+  cmd = frags[0].charAt(0);
+
+  if(numFrag == 6 && cmd == CMD_SET_INIT) {
+      setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
+  } else if(numFrag == 6 && cmd == CMD_SET_STOP) {
+    setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
+  } else if(numFrag == 1 && cmd == CMD_REQUEST) {
+    sendCommands();
+  }
 }
 
