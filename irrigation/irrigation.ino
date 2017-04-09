@@ -12,7 +12,8 @@ const char SERIAL_MAX_FRAGS = 6;
 
 const char CMD_SET_INIT = 'I';
 const char CMD_SET_STOP = 'S';
-const char CMD_REQUEST = 'R';
+const char CMD_REQUEST_COMMANDS = 'R';
+const char CMD_UPDATE = 'U';
 
 // ----------------------------
 
@@ -51,6 +52,7 @@ void updateLines();
 void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
 void sendCommands();
+void sendUpdates();
 
 // -------------------------------------------------------------
 
@@ -113,7 +115,7 @@ void updateLines() {
   
   // Check conditions
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
-    if(!lines[numSensor].configured) break;
+    if(!lines[numSensor].configured) continue;
     //Serial.println("Checking line " + (String) numSensor + "...");
 
     currentTemp = readTemp(SENSOR_TEMP_START_PIN + numSensor);
@@ -158,6 +160,18 @@ void sendCommands() {
   
 }
 
+// Send updated sensor reads
+void sendUpdates() {
+  String updates = "U";
+  for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
+    if(!lines[numSensor].configured) continue;
+    updates += SERIAL_DELIM + (String) numSensor + 
+               SERIAL_DELIM + (String) readTemp(SENSOR_TEMP_START_PIN + numSensor) + 
+               SERIAL_DELIM + "0";  // Fixed humidity for now
+  }
+  Serial.println(updates);
+}
+
 // -------------------------------------------------------------
 
 // Function called when a serial message arrive
@@ -194,8 +208,10 @@ void serialEvent() {
       setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
   } else if(numFrag == 6 && cmd == CMD_SET_STOP) {
     setStopCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
-  } else if(numFrag == 1 && cmd == CMD_REQUEST) {
+  } else if(numFrag == 1 && cmd == CMD_REQUEST_COMMANDS) {
     sendCommands();
+  } else if(numFrag == 1 && cmd == CMD_UPDATE) {
+    sendUpdates();
   }
 }
 

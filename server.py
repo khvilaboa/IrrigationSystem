@@ -10,6 +10,8 @@ dispatcher = updater.dispatcher
 
 arduino = serial.Serial('COM7', 9600)
 
+SERIAL_DELIM = ";"
+
 OP_NOTHING = 0
 OP_LESS = 1
 OP_GREATER = 2
@@ -33,7 +35,7 @@ def unknown(bot, update):
 
 	
 # Set start condition for a line
-def set_start(bot, update):
+def set_start_condition(bot, update):
 	print("\nReceived (start): %s" % update.message.text)
 	
 	try:
@@ -46,7 +48,7 @@ def set_start(bot, update):
 	
 	
 # Set stop condition for a line
-def set_stop(bot, update):
+def set_stop_condition(bot, update):
 	print("\nReceived (stop): %s" % update.message.text)
 	
 	try:
@@ -57,11 +59,18 @@ def set_stop(bot, update):
 	except Exception as e:
 		print(e)
 	
+# Request sensor updates (for all the lines)
+def get_sensor_updates(bot, update):
+	try:
+		arduino.write("U") 
+	except Exception as e:
+		print(e)
 	
 # Handlers
 dispatcher.add_handler(CommandHandler('start', start))
-dispatcher.add_handler(CommandHandler('setStartCondition', set_start))
-dispatcher.add_handler(CommandHandler('setStopCondition', set_stop))
+dispatcher.add_handler(CommandHandler('startCondition', set_start_condition))
+dispatcher.add_handler(CommandHandler('stopCondition', set_stop_condition))
+dispatcher.add_handler(CommandHandler('updates', get_sensor_updates))
 dispatcher.add_handler(MessageHandler(Filters.text, text))
 dispatcher.add_handler(MessageHandler(Filters.command, unknown))
 
@@ -85,17 +94,25 @@ def parse_condition(text):
 		_, temp_value = condition.split(">")
 	else:
 		raise Exception()
-		
-	return int(num_line), temp_op, float(temp_value)
-		
+	
 	print("Condition: " + condition)
-
+	return int(num_line), temp_op, float(temp_value)
 
 # ------------------------------------------------------------------------------------
 
 # Loop to read arduino data via serial
 while 1:
 	try:
-		print(arduino.readline())
+		input = arduino.readline().replace("\r\n", "")
+		print(input)
+		
+		if input.startswith("U;"):  # Update
+			updates = input.split(SERIAL_DELIM)[1:]
+			print(updates)
+			pairs = zip(*[updates[i::3] for i in range(3)]) 
+			
+			for line, temp, hum in pairs:
+				print(line, temp, hum)
+			
 	except serial.SerialTimeoutException:
 		print('Data could not be read')
