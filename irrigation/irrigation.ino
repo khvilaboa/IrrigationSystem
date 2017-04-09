@@ -146,7 +146,11 @@ void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, floa
 
 // Set the stop conditions to activate a irrigation line
 void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
-  
+  lines[numSensor].tempStopOp = tempOp;
+  lines[numSensor].tempStopThr = tempValue;
+  lines[numSensor].humStopOp = humOp;
+  lines[numSensor].humStopThr = humValue;
+  lines[numSensor].configured = true;
 }
 
 // Send all the commands via serial
