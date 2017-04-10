@@ -8,7 +8,7 @@ const int NUM_LINES = 2;
 const int REFRESH_TIME = 2000;
 
 const char SERIAL_DELIM = ';';
-const char SERIAL_MAX_FRAGS = 6;
+const char SERIAL_MAX_FRAGS = 7;
 
 const char CMD_SET_INIT = 'I';
 const char CMD_SET_STOP = 'S';
@@ -35,6 +35,9 @@ struct irrigationLine {
   int tempStopOp;
   float tempStopThr;
 
+  int startMidOp;
+  int stopMidOp;
+
   // Humidity
   int humStartOp;
   float humStartThr;
@@ -49,8 +52,8 @@ struct irrigationLine {
 float readTemp(int sensor);
 void updateLines();
 
-void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
-void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue);
+void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
+void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void sendCommands();
 void sendUpdates();
 
@@ -130,11 +133,12 @@ void updateLines() {
 }
 
 // Set the start conditions to activate a irrigation line
-void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
+void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue) {
   lines[numSensor].tempStartOp = tempOp;
   lines[numSensor].tempStartThr = tempValue;
   lines[numSensor].humStartOp = humOp;
   lines[numSensor].humStartThr = humValue;
+  lines[numSensor].startMidOp = humValue;
 
   // if the the line wans't previously configured init stop conditions to the start ones
   if(!lines[numSensor].configured) {
@@ -142,17 +146,27 @@ void setStartCommand(int numSensor, int tempOp, float tempValue, int humOp, floa
     lines[numSensor].tempStopThr = tempValue;
     lines[numSensor].humStopOp = humOp;
     lines[numSensor].humStopThr = humValue;
+    lines[numSensor].stopMidOp = humValue;
     lines[numSensor].configured = true;
   }
 }
 
 // Set the stop conditions to activate a irrigation line
-void setStopCommand(int numSensor, int tempOp, float tempValue, int humOp, float humValue) {
+void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue) {
   lines[numSensor].tempStopOp = tempOp;
   lines[numSensor].tempStopThr = tempValue;
   lines[numSensor].humStopOp = humOp;
   lines[numSensor].humStopThr = humValue;
-  lines[numSensor].configured = true;
+  lines[numSensor].stopMidOp = humValue;
+
+  if(!lines[numSensor].configured) {
+    lines[numSensor].tempStartOp = tempOp;
+    lines[numSensor].tempStartThr = tempValue;
+    lines[numSensor].humStartOp = humOp;
+    lines[numSensor].humStartThr = humValue;
+    lines[numSensor].startMidOp = humValue;
+    lines[numSensor].configured = true;
+  }
 }
 
 // Send all the commands via serial
@@ -204,10 +218,10 @@ void serialEvent() {
   if(frags[0] == "") return;
   cmd = frags[0].charAt(0);
 
-  if(numFrag == 6 && cmd == CMD_SET_INIT) {
-      setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
-  } else if(numFrag == 6 && cmd == CMD_SET_STOP) {
-    setStopCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toFloat());
+  if(numFrag == 7 && cmd == CMD_SET_INIT) {
+    setStartCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toInt(), frags[6].toFloat());
+  } else if(numFrag == 7 && cmd == CMD_SET_STOP) {
+    setStopCommand(frags[1].toInt(), frags[2].toInt(), frags[3].toFloat(), frags[4].toInt(), frags[5].toInt(), frags[6].toFloat());
   } else if(numFrag == 1 && cmd == CMD_REQUEST_COMMANDS) {
     sendCommands();
   } else if(numFrag == 1 && cmd == CMD_UPDATE) {

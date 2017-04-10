@@ -86,8 +86,8 @@ class IrrigationSystem:
 			self.start_cond = start_cond
 			self.stop_cond = stop_cond
 	
-	def __init__(self):
-		self.serial = serial.Serial('COM7', 9600)
+	def __init__(self, port):
+		self.serial = serial.Serial(port, 9600)
 		self.lines = {}
 
 	def __str__(self):
@@ -108,7 +108,7 @@ class IrrigationSystem:
 # ------------------------------------------------------------------------------------
 
 message = None
-#irrigation = IrrigationSystem();
+irrigation = IrrigationSystem("COM7");
 
 # Default command (executed on bot init)
 def start(bot, update):
@@ -136,7 +136,7 @@ def set_start_condition(bot, update):
 		cmd = "I;%d;%d;%.2f;0;0" % num_line, temp_op, temp_thr, hum_op, hum_thr
 		print(cmd)
 		
-		arduino.write(cmd)
+		irrigation.serial.write(cmd)
 		update.message.reply_text(DIC["start_cond_success"])
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
@@ -151,7 +151,7 @@ def set_stop_condition(bot, update):
 		cmd = "S;%d;%d;%.2f;0;0" % parse_condition(update.message.text)
 		print(cmd)
 		
-		arduino.write(cmd)
+		irrigation.serial.write(cmd)
 		update.message.reply_text(DIC["start_cond_success"])
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
@@ -163,7 +163,7 @@ def get_sensor_updates(bot, update):
 	message = update.message
 	
 	try:
-		arduino.write("U") 
+		irrigation.serial.write("U") 
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
@@ -185,7 +185,7 @@ if __name__ == "__main__":
 	# Loop to read arduino data via serial
 	while 1:
 		try:
-			input = arduino.readline().replace("\r\n", "")
+			input = irrigation.serial.readline().replace("\r\n", "")
 			print(input)
 			
 			if input.startswith("U;"):  # Update
