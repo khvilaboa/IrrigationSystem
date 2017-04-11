@@ -16,8 +16,8 @@ SERIAL_DELIM = ";"
 
 SPANISH_DIC = {
 	"unknown_cmd": "Comando no reconocido",
-	"start_cond_success": "Condicion establecida",
-	"comm_error": "Condicion establecida",
+	"cond_success": "Condición establecida",
+	"comm_error": "No se pudo establecer la conexión",
 	"line": "Línea"
 }
 
@@ -63,7 +63,7 @@ class Condition:
 					temp_op, temp_thr = cls.OPERATORS[op2], float(value2)
 		else:
 			raise Exception()
-		#pdb.set_trace()
+
 		mid_op = cls.OPERATORS[mid_op] if mid_op is not None else cls.OPERATORS["none"]
 		return cls(temp_op, temp_thr, mid_op, hum_op, hum_thr)
 		
@@ -78,8 +78,17 @@ class Condition:
 			return "%s %s %s" % (temp, inv_op[self.mid_op], hum)
 		else:
 			return temp if temp is not None else hum
+			
+	def encode(self, delimiter = ";"):
+		return "%d%s%.2f%s%d%s%d%s%.2f" % (self.temp_op, delimiter, self.temp_thr, delimiter, \
+											 self.mid_op, delimiter, self.hum_op, delimiter, self.hum_thr)
 
 class IrrigationSystem:
+
+	CMD_SET_INIT = 'I';
+	CMD_SET_STOP = 'S';
+	CMD_REQUEST_COMMANDS = 'R';
+	CMD_UPDATE = 'U';
 
 	class IrrigationLine:
 		def __init__(self, start_cond, stop_cond):
@@ -93,17 +102,29 @@ class IrrigationSystem:
 	def __str__(self):
 		pass
 		
-	def start_condition(self, num_line, start_cond):
+	def start_condition(self, num_line, start_cond, delimiter = ";"):
+		print(start_cond.encode())
 		if num_line in self.lines:
 			self.lines[num_line].start_cond = start_cond
 		else:
-			self.lines[num_line] = IrrigationLine(start_cond, start_cond)
+			self.lines[num_line] = self.IrrigationLine(start_cond, start_cond)
+			
+		cmd = "%s%s%d%s%s" % (IrrigationSystem.CMD_SET_INIT, delimiter, num_line, delimiter, start_cond.encode(delimiter))
+		print(cmd)
+		self.serial.write(cmd)
 		
-	def stop_condition(self, num_line, stop_cond):
+	def stop_condition(self, num_line, stop_cond, delimiter = ";"):
 		if num_line in self.lines:
 			self.lines[num_line].stop_cond = stop_cond
 		else:
-			self.lines[num_line] = IrrigationLine(stop_cond, stop_cond)
+			self.lines[num_line] = self.IrrigationLine(stop_cond, stop_cond)
+			
+		cmd = "%s%s%d%s%s" % (IrrigationSystem.CMD_SET_STOP, delimiter, num_line, delimiter, stop_cond.encode(delimiter))
+		print(cmd)
+		self.serial.write(cmd)
+		
+	def update(self):
+		self.serial.write(IrrigationSystem.CMD_UPDATE)
 		
 # ------------------------------------------------------------------------------------
 
@@ -131,13 +152,17 @@ def set_start_condition(bot, update):
 	print("\nReceived (start): %s" % update.message.text)
 	
 	try:
-		num_line, temp_op, temp_thr, hum_op, hum_thr = parse_condition(update.message.text)
-		irrigation.start_condition(num_line, temp_op, temp_thr, hum_op, hum_thr)
-		cmd = "I;%d;%d;%.2f;0;0" % num_line, temp_op, temp_thr, hum_op, hum_thr
-		print(cmd)
+		textSp = update.message.text.split()
+		num_line = int(textSp[1])
+		cond_text = " ".join(textSp[2:])
 		
-		irrigation.serial.write(cmd)
-		update.message.reply_text(DIC["start_cond_success"])
+		start_cond = Condition.parse(cond_text)
+		irrigation.start_condition(num_line, start_cond)
+		#cmd = "I;%d;%d;%.2f;0;0" % num_line, temp_op, temp_thr, hum_op, hum_thr
+		#print(cmd)
+		#irrigation.serial.write(cmd)
+		
+		update.message.reply_text(DIC["cond_success"])
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
@@ -148,11 +173,14 @@ def set_stop_condition(bot, update):
 	print("\nReceived (stop): %s" % update.message.text)
 	
 	try:
-		cmd = "S;%d;%d;%.2f;0;0" % parse_condition(update.message.text)
-		print(cmd)
+		textSp = update.message.text.split()
+		num_line = int(textSp[1])
+		cond_text = " ".join(textSp[2:])
+		stop_cond  = Condition.parse(cond_text)
+		irrigation.stop_condition(num_line, stop_cond)
 		
-		irrigation.serial.write(cmd)
-		update.message.reply_text(DIC["start_cond_success"])
+		#irrigation.serial.write(cmd)
+		update.message.reply_text(DIC["cond_success"])
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
@@ -163,7 +191,7 @@ def get_sensor_updates(bot, update):
 	message = update.message
 	
 	try:
-		irrigation.serial.write("U") 
+		irrigation.update() 
 	except Exception as e:
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
