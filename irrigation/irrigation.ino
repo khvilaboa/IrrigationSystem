@@ -1,3 +1,6 @@
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(8, 9, 10, 11, 12, 13);
+
 // ----------------------------
 
 const int SENSOR_TEMP_START_PIN = A2; // NUM_SENSORS from here (temp)
@@ -72,6 +75,11 @@ void setup() {
   // init serial communication
   Serial.begin(9600);
 
+  lcd.begin(16, 2);
+  lcd.print("IrrigationSystem");
+  lcd.setCursor(0, 1);
+  lcd.print("Starting");
+
   //configure input/outputs and init values
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -113,8 +121,12 @@ void setup() {
   lines[1].humStopOp = OP_LESS;
   lines[1].stopMidOp = OP_AND;
   
-  for(int numSensor=2; numSensor < NUM_LINES; numSensor++)
-    lines[numSensor].configured = false;
+  for(int numSensor=2; numSensor < NUM_LINES; numSensor++) lines[numSensor].configured = false;
+
+  for(int i=0; i<3; i++) {
+    lcd.print(".");
+    delay(1000);
+  }
 }
 
 void loop() {
@@ -131,6 +143,11 @@ void loop() {
                                (String) digitalRead(IRRIGATION_START_PIN + numSensor));
   }*/
   updateLines();
+  
+  lcd.setCursor(0, 0);
+  lcd.print("L0 " + (String) readTemp(SENSOR_TEMP_START_PIN) + "C " + (String) readHum(SENSOR_HUM_START_PIN) + "%");
+  lcd.setCursor(0, 1);
+  lcd.print("L1 " + (String) readTemp(SENSOR_TEMP_START_PIN + 1) + "C " + (String) readHum(SENSOR_HUM_START_PIN + 1) + "%");
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
@@ -165,9 +182,9 @@ void updateLines() {
     //Serial.println("Checking line " + (String) numSensor + "...");
 
     currentHum = readHum(SENSOR_HUM_START_PIN + numSensor);
-    delay(500); 
+    //delay(500); 
     currentTemp = readTemp(SENSOR_TEMP_START_PIN + numSensor);
-    delay(500); 
+    //delay(500); 
 
     // Start condition
     Serial.println("Line (" + (String) numSensor + "):");
