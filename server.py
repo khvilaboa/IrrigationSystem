@@ -224,7 +224,7 @@ if __name__ == "__main__":
 				updatesResp = ""
 				for line, temp, hum in pairs:
 					print(line, temp, hum)
-					updatesResp += DIC["line"] + " %s : %.2f C, %.2f\n" % (line, float(temp), float(hum))
+					updatesResp += DIC["line"] + " %s : %.2f C, %.2f %%\n" % (line, float(temp), float(hum))
 					
 				if updatesResp != "" and message is not None:
 					message.reply_text(updatesResp[:-1])

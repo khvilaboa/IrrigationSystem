@@ -249,7 +249,7 @@ void sendUpdates() {
     if(!lines[numSensor].configured) continue;
     updates += SERIAL_DELIM + (String) numSensor + 
                SERIAL_DELIM + (String) readTemp(SENSOR_TEMP_START_PIN + numSensor) + 
-               SERIAL_DELIM + "0";  // Fixed humidity for now
+               SERIAL_DELIM + (String) readHum(SENSOR_HUM_START_PIN + numSensor); 
   }
   Serial.println(updates);
 }
