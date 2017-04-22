@@ -1,6 +1,7 @@
 // ----------------------------
 
-const int SENSOR_TEMP_START_PIN = A0; // NUM_SENSORS from here (temp)
+const int SENSOR_TEMP_START_PIN = A2; // NUM_SENSORS from here (temp)
+const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 
 //const int NUM_SENSORS = 2;
@@ -14,6 +15,12 @@ const char CMD_SET_INIT = 'I';
 const char CMD_SET_STOP = 'S';
 const char CMD_REQUEST_COMMANDS = 'R';
 const char CMD_UPDATE = 'U';
+
+const int OP_NONE = 0;
+const int OP_LESS = 1;
+const int OP_GREATER = 2;
+const int OP_AND = 3;
+const int OP_OR = 4;
 
 // ----------------------------
 
@@ -51,6 +58,8 @@ struct irrigationLine {
 
 float readTemp(int sensor);
 void updateLines();
+bool checkCondition(float value, int op, float value2);
+bool checkCondition(bool value, int op, bool value2);
 
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
@@ -70,6 +79,9 @@ void setup() {
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     pinMode(IRRIGATION_START_PIN + numSensor, OUTPUT);
     digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
+
+    pinMode(SENSOR_TEMP_START_PIN  + numSensor, INPUT);
+    pinMode(SENSOR_HUM_START_PIN  + numSensor, INPUT);
   }
 
   inputString.reserve(100);
@@ -77,11 +89,29 @@ void setup() {
   // Fixed config for test 
   lines[0].configured = true;
   lines[0].tempStartThr = 22;
+  lines[0].tempStartOp = OP_GREATER;
+  lines[0].humStartThr = 80;
+  lines[0].humStartOp = OP_GREATER;
+  lines[0].startMidOp = OP_AND;
+  
   lines[0].tempStopThr = 22;
-
+  lines[0].tempStopOp = OP_LESS;
+  lines[0].humStopThr = 50;
+  lines[0].humStopOp = OP_LESS;
+  lines[0].stopMidOp = OP_OR;
+  
   lines[1].configured = true;
   lines[1].tempStartThr = 23;
+  lines[1].tempStartOp = OP_GREATER;
+  lines[1].humStartThr = 50;
+  lines[1].humStartOp = OP_GREATER;
+  lines[1].startMidOp = OP_AND;
+  
   lines[1].tempStopThr = 22;
+  lines[1].tempStopOp = OP_LESS;
+  lines[1].humStopThr = 30;
+  lines[1].humStopOp = OP_LESS;
+  lines[1].stopMidOp = OP_AND;
   
   for(int numSensor=2; numSensor < NUM_LINES; numSensor++)
     lines[numSensor].configured = false;
@@ -89,18 +119,23 @@ void setup() {
 
 void loop() {
   //Serial.print();
-  for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
-    Serial.println("Sensor " + (String) numSensor + ": " + 
+  /*for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
+    Serial.println("\n\nTemp " + (String) numSensor + ": " + 
                                (String) readTemp(SENSOR_TEMP_START_PIN + numSensor) + " C " + 
                                "(sTh: " + (String) lines[numSensor].tempStartThr + " / " + (String) lines[numSensor].tempStopThr + ") -> " + 
                                (String) digitalRead(IRRIGATION_START_PIN + numSensor));
-  }
+    delay(100); 
+    Serial.println("Hum " + (String) numSensor + ": " + 
+                               (String) analogRead(SENSOR_HUM_START_PIN + numSensor) + " % " + 
+                               "(sTh: " + (String) lines[numSensor].humStartThr + " / " + (String) lines[numSensor].humStopThr + ") -> " + 
+                               (String) digitalRead(IRRIGATION_START_PIN + numSensor));
+  }*/
   updateLines();
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
-  delay(1000);
+  delay(2000);
 }
 
 // -------------------------------------------------------------
@@ -112,24 +147,56 @@ float readTemp(int sensor) {
   return  millivolts / 10; // one celsius for each 10 millivolts (LM35)
 }
 
+// Translate the soil humidity read to humidity percentage (given the input pin)
+float readHum(int sensor) {
+  int value = analogRead(sensor);
+  float perc = map(value, 0, 1023, 100, 0);
+  return  perc; 
+}
+
 // Check if the lines accomplish the conditions to start/stop
 void updateLines() {
-  float currentTemp;
+  float currentTemp, currentHum;
+  bool cond1, cond2;
   
   // Check conditions
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     if(!lines[numSensor].configured) continue;
     //Serial.println("Checking line " + (String) numSensor + "...");
 
+    currentHum = readHum(SENSOR_HUM_START_PIN + numSensor);
+    delay(500); 
     currentTemp = readTemp(SENSOR_TEMP_START_PIN + numSensor);
+    delay(500); 
+
+    // Start condition
+    Serial.println("Line (" + (String) numSensor + "):");
+    cond1 = checkCondition(currentTemp, lines[numSensor].tempStartOp, lines[numSensor].tempStartThr);
+    cond2 = checkCondition(currentHum, lines[numSensor].humStartOp, lines[numSensor].humStartThr);
+    if(checkCondition(cond1, lines[numSensor].startMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
+
+    // Stop condition
+    cond1 = checkCondition(currentTemp, lines[numSensor].tempStopOp, lines[numSensor].tempStopThr);
+    cond2 = checkCondition(currentHum, lines[numSensor].humStopOp, lines[numSensor].humStopThr);
+    if(checkCondition(cond1, lines[numSensor].stopMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
+    Serial.println("");
     
-    if(currentTemp > lines[numSensor].tempStartThr) {  // Start condition
+    /*if(currentTemp > lines[numSensor].tempStartThr) {  // Start condition
       digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
       
     } else if(currentTemp < lines[numSensor].tempStopThr) { // Stop condition
       digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
-    }
+    }*/
   } 
+}
+
+bool checkCondition(float value, int op, float value2) {
+  Serial.println("cond " + (String) value + ", " + (String) op + ", " + (String) value2 + " -> " + (String) ((op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2)));
+  return (op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2);
+}
+
+bool checkCondition(bool value, int op, bool value2) {
+  return op == OP_NONE || (op == OP_AND && value && value2) || (op == OP_OR && (value || value2));
 }
 
 // Set the start conditions to activate a irrigation line
@@ -138,7 +205,8 @@ void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int 
   lines[numSensor].tempStartThr = tempValue;
   lines[numSensor].humStartOp = humOp;
   lines[numSensor].humStartThr = humValue;
-  lines[numSensor].startMidOp = humValue;
+  lines[numSensor].startMidOp = midOp;
+  Serial.println(midOp);
 
   // if the the line wans't previously configured init stop conditions to the start ones
   if(!lines[numSensor].configured) {
@@ -146,7 +214,7 @@ void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int 
     lines[numSensor].tempStopThr = tempValue;
     lines[numSensor].humStopOp = humOp;
     lines[numSensor].humStopThr = humValue;
-    lines[numSensor].stopMidOp = humValue;
+    lines[numSensor].stopMidOp = midOp;
     lines[numSensor].configured = true;
   }
 }
@@ -157,14 +225,14 @@ void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int h
   lines[numSensor].tempStopThr = tempValue;
   lines[numSensor].humStopOp = humOp;
   lines[numSensor].humStopThr = humValue;
-  lines[numSensor].stopMidOp = humValue;
+  lines[numSensor].stopMidOp = midOp;
 
   if(!lines[numSensor].configured) {
     lines[numSensor].tempStartOp = tempOp;
     lines[numSensor].tempStartThr = tempValue;
     lines[numSensor].humStartOp = humOp;
     lines[numSensor].humStartThr = humValue;
-    lines[numSensor].startMidOp = humValue;
+    lines[numSensor].startMidOp = midOp;
     lines[numSensor].configured = true;
   }
 }
