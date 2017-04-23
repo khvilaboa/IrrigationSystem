@@ -1,4 +1,5 @@
 #include <LiquidCrystal.h>
+
 LiquidCrystal lcd(8, 9, 10, 11, 12, 13);
 
 // ----------------------------
@@ -7,6 +8,7 @@ const int SENSOR_TEMP_START_PIN = A2; // NUM_SENSORS from here (temp)
 const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 const int BUTTONS_START_PIN = 18; // Buttons to handle LCD
+const int MOTOR_START_PIN = 47; // Step motor
 
 const int DEBOUNCE_MILLIS = 200; // Millis to wait in a button interrupt to handle debounce
 
@@ -42,6 +44,9 @@ eLcdState lcdState = SENSOR_STATUS;
 int lcdSelectedLine = -1;
 int lcdMenuIndex = 0;
 bool lcdOptionSelected = false;
+
+int motorStatus = 1;
+bool motorDir = false;
 
 struct irrigationLine {
   bool configured;
@@ -106,6 +111,9 @@ void updateLcd();
 void lcdSensorsStatus();
 void lcdMenu();
 
+// Motor
+void motorStep(int steps, bool inverse);
+
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void sendCommands();
@@ -131,12 +139,17 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
+  // Buttons
   for(int i=0; i < 4; i++) pinMode(BUTTONS_START_PIN + i, INPUT);
   attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN), btnBack, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 1), btnDown, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 2), btnUp, FALLING);
   attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 3), btnForward, FALLING);
-  
+
+  // Step motor
+  for(int i=0; i < 4; i++) pinMode(MOTOR_START_PIN + i*2, OUTPUT);
+
+  // Sensor / Irrigation outputs
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     pinMode(IRRIGATION_START_PIN + numSensor, OUTPUT);
     digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
@@ -212,12 +225,39 @@ void loop() {
   }*/
   updateLines();
   updateLcd();
-  
+  //motorStep(26, motorDir);  // Uncomment this for test the motor
+  //motorDir = !motorDir;
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
   delay(2000);
+}
+
+// -------------------------------------------------------------
+
+void motorStep(int steps, bool inverse) {
+  for(int i = 0; i < steps; i++) {
+    digitalWrite(MOTOR_START_PIN, (motorStatus & 0x1) != 0);
+    digitalWrite(MOTOR_START_PIN + 2, (motorStatus & 0x2) != 0);
+    digitalWrite(MOTOR_START_PIN + 4, (motorStatus & 0x4) != 0);
+    digitalWrite(MOTOR_START_PIN + 6, (motorStatus & 0x8) != 0);
+
+    if(motorDir) {
+      motorStatus <<= 1;
+      if(motorStatus > 8) motorStatus = 1;
+    } else {
+      motorStatus >>= 1;
+      if(motorStatus < 1) motorStatus = 8;
+    }
+    
+    delay(10);
+  }
+
+  digitalWrite(MOTOR_START_PIN, 0);
+  digitalWrite(MOTOR_START_PIN + 2, 0);
+  digitalWrite(MOTOR_START_PIN + 4, 0);
+  digitalWrite(MOTOR_START_PIN + 6, 0);
 }
 
 // -------------------------------------------------------------
