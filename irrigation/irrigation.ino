@@ -8,7 +8,7 @@ const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 
 //const int NUM_SENSORS = 2;
-const int NUM_LINES = 2;
+const int NUM_LINES = 4;
 const int REFRESH_TIME = 2000;
 
 const char SERIAL_DELIM = ';';
@@ -189,7 +189,14 @@ void loop() {
   lcd.print("L0  " + (String) readTemp(SENSOR_TEMP_START_PIN) + "C  " + (String) readHum(SENSOR_HUM_START_PIN) + "%");
   lcd.setCursor(0, 1);
   lcd.print("L1  " + (String) readTemp(SENSOR_TEMP_START_PIN + 1) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + 1) + "%");
-  
+  for(int numLine=0; numLine < NUM_LINES; numLine++) {
+    lcd.setCursor(0, numLine);
+    if(lines[numLine].configured) {
+      lcd.print("L" + (String) numLine + "  " + (String) readTemp(SENSOR_TEMP_START_PIN + numLine) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + numLine) + "%");
+    } else {
+      lcd.print("L" + (String) numLine + "  -       -");
+    }
+  }
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
