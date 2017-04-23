@@ -35,7 +35,13 @@ const int OP_OR = 4;
 //float stopThresholds[NUM_LINES][NUM_SENSORS] = {{22, 0}, {22, 0}};
 
 String inputString = "";
-int nextButtonMillis = millis();  // to control rebounds
+long nextButtonMillis = millis();  // to control rebounds
+
+typedef enum {SENSOR_STATUS, MAIN_MENU} eLcdState;
+eLcdState lcdState = SENSOR_STATUS;
+int lcdSelectedLine = -1;
+int lcdMenuIndex = 0;
+bool lcdOptionSelected = false;
 
 struct irrigationLine {
   bool configured;
@@ -89,11 +95,16 @@ void updateLines();
 bool checkCondition(float value, int op, float value2);
 bool checkCondition(bool value, int op, bool value2);
 
-// Callbacks for LCD buttons interrupts
+// Callbacks for buttons interrupts
 void btnBack();
 void btnDown();
 void btnUp();
 void btnForward();
+
+// Function to show data in the LCD display
+void updateLcd();
+void lcdSensorsStatus();
+void lcdMenu();
 
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
@@ -200,19 +211,9 @@ void loop() {
                                (String) digitalRead(IRRIGATION_START_PIN + numSensor));
   }*/
   updateLines();
+  updateLcd();
   
-  lcd.setCursor(0, 0);
-  lcd.print("L0  " + (String) readTemp(SENSOR_TEMP_START_PIN) + "C  " + (String) readHum(SENSOR_HUM_START_PIN) + "%");
-  lcd.setCursor(0, 1);
-  lcd.print("L1  " + (String) readTemp(SENSOR_TEMP_START_PIN + 1) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + 1) + "%");
-  for(int numLine=0; numLine < NUM_LINES; numLine++) {
-    lcd.setCursor(0, numLine);
-    if(lines[numLine].configured) {
-      lcd.print("L" + (String) numLine + "  " + (String) readTemp(SENSOR_TEMP_START_PIN + numLine) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + numLine) + "%");
-    } else {
-      lcd.print("L" + (String) numLine + "  -       -");
-    }
-  }
+  
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
@@ -222,31 +223,109 @@ void loop() {
 // -------------------------------------------------------------
 
 void btnBack() {
+  Serial.print("<");
   if(millis() > nextButtonMillis) {
     Serial.println("Back button pressed");
+    if(lcdState == MAIN_MENU) {
+      lcdState = SENSOR_STATUS;
+      updateLcd();
+    }
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+    Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnDown() {
+  Serial.print("v");
   if(millis() > nextButtonMillis) {
     Serial.println("Down button pressed");
+    if(lcdState == SENSOR_STATUS && lcdSelectedLine >= 0) {
+      lcdSelectedLine--;
+      if(lcdSelectedLine < 0) {
+        lcd.noCursor();
+      } else {
+        lcd.setCursor(0, lcdSelectedLine);
+        lcd.cursor();
+      }
+    } else if(lcdState == MAIN_MENU && lcdMenuIndex > 0 && !lcdOptionSelected) {
+      lcdMenuIndex--;
+    }
+    updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+    Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnUp() {
+  Serial.print("^");
   if(millis() > nextButtonMillis) {
     Serial.println("Up button pressed");
+    if(lcdState == SENSOR_STATUS && lcdSelectedLine < NUM_LINES - 1) {
+      lcdSelectedLine++;
+      lcd.setCursor(0, lcdSelectedLine);
+      lcd.cursor();      
+    } else if(lcdState == MAIN_MENU && lcdMenuIndex < 2 && !lcdOptionSelected) {
+      lcdMenuIndex++;
+    }
+    updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+    Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnForward() {
+  Serial.println((String) millis() + ", " + nextButtonMillis);
+  Serial.print(">");
   if(millis() > nextButtonMillis) {
     Serial.println("Forward button pressed");
+    if(lcdState == SENSOR_STATUS && lcdSelectedLine != -1) {
+      lcdState = MAIN_MENU;
+    } else if(lcdState == MAIN_MENU) {
+      lcdOptionSelected = !lcdOptionSelected;
+    }
+    updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+    Serial.println((String) millis() + ", " + nextButtonMillis);
   }
+}
+
+void updateLcd() {
+  switch(lcdState) {
+    case SENSOR_STATUS: lcdSensorsStatus(); break;
+    case MAIN_MENU: lcdMenu(); break;
+  }
+
+  if(lcdState == SENSOR_STATUS && lcdSelectedLine != -1) {
+    lcd.setCursor(0, lcdSelectedLine);
+  } else if(lcdState == MAIN_MENU && !lcdOptionSelected) {
+    lcd.setCursor(0, lcdMenuIndex);
+  } else if(lcdState == MAIN_MENU && lcdOptionSelected) {
+    switch(lcdMenuIndex) {
+      case 0: lcd.setCursor(9, 0); //Enabled
+    }
+  }
+}
+
+void lcdSensorsStatus() {
+  lcd.clear();
+  for(int numLine=0; numLine < NUM_LINES; numLine++) {
+    lcd.setCursor(0, numLine);
+    if(lines[numLine].configured) {
+      lcd.print("L" + (String) numLine + "  " + (String) readTemp(SENSOR_TEMP_START_PIN + numLine) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + numLine) + "%");
+    } else {
+      lcd.print("L" + (String) numLine + "  -       -");
+    }
+  }
+}
+
+void lcdMenu() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Enabled: " + (String)(lines[lcdSelectedLine].configured?"Yes":"No"));
+  lcd.setCursor(0, 1);
+  lcd.print("Start condition");
+  lcd.setCursor(0, 2);
+  lcd.print("Stop condition");
 }
 
 // -------------------------------------------------------------
