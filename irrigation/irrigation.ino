@@ -55,7 +55,28 @@ struct irrigationLine {
   float humStopThr;
 } lines[NUM_LINES];
 
+// Custom chars from arduino examples
+byte armsDown[8] = {
+  0b00100,
+  0b01010,
+  0b00100,
+  0b00100,
+  0b01110,
+  0b10101,
+  0b00100,
+  0b01010
+};
 
+byte armsUp[8] = {
+  0b00100,
+  0b01010,
+  0b00100,
+  0b10101,
+  0b01110,
+  0b00100,
+  0b00100,
+  0b01010
+};
 
 // ----------------------------
 
@@ -75,10 +96,15 @@ void setup() {
   // init serial communication
   Serial.begin(9600);
 
-  lcd.begin(16, 2);
-  lcd.print("IrrigationSystem");
-  lcd.setCursor(0, 1);
+  lcd.begin(20, 4);
+  lcd.print("Irrigation System");
+  lcd.setCursor(0, 2);
   lcd.print("Starting");
+  int nextDotPos = 8;
+
+  // create new characters
+  lcd.createChar(0, armsDown);
+  lcd.createChar(1, armsUp);
 
   //configure input/outputs and init values
   pinMode(LED_BUILTIN, OUTPUT);
@@ -123,10 +149,25 @@ void setup() {
   
   for(int numSensor=2; numSensor < NUM_LINES; numSensor++) lines[numSensor].configured = false;
 
+  // Start LCD animation
   for(int i=0; i<3; i++) {
+    // arms down
+    lcd.setCursor(15, 2);
+    lcd.write((byte) 0);
+    delay(200);
+
+    // add a dot
+    lcd.setCursor(nextDotPos++, 2);
     lcd.print(".");
+    delay(200);
+
+    // arms up
+    lcd.setCursor(15, 2);
+    lcd.write((byte) 1);
+    
     delay(1000);
   }
+  lcd.clear();
 }
 
 void loop() {
@@ -145,9 +186,9 @@ void loop() {
   updateLines();
   
   lcd.setCursor(0, 0);
-  lcd.print("L0 " + (String) readTemp(SENSOR_TEMP_START_PIN) + "C " + (String) readHum(SENSOR_HUM_START_PIN) + "%");
+  lcd.print("L0  " + (String) readTemp(SENSOR_TEMP_START_PIN) + "C  " + (String) readHum(SENSOR_HUM_START_PIN) + "%");
   lcd.setCursor(0, 1);
-  lcd.print("L1 " + (String) readTemp(SENSOR_TEMP_START_PIN + 1) + "C " + (String) readHum(SENSOR_HUM_START_PIN + 1) + "%");
+  lcd.print("L1  " + (String) readTemp(SENSOR_TEMP_START_PIN + 1) + "C  " + (String) readHum(SENSOR_HUM_START_PIN + 1) + "%");
   
   digitalWrite(LED_BUILTIN, LOW);   // turn the LED on (HIGH is the voltage level)
   delay(100);                        // wait for a second
