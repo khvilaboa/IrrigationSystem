@@ -6,6 +6,9 @@ LiquidCrystal lcd(8, 9, 10, 11, 12, 13);
 const int SENSOR_TEMP_START_PIN = A2; // NUM_SENSORS from here (temp)
 const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
+const int BUTTONS_START_PIN = 18; // Buttons to handle LCD
+
+const int DEBOUNCE_MILLIS = 200; // Millis to wait in a button interrupt to handle debounce
 
 //const int NUM_SENSORS = 2;
 const int NUM_LINES = 4;
@@ -32,6 +35,7 @@ const int OP_OR = 4;
 //float stopThresholds[NUM_LINES][NUM_SENSORS] = {{22, 0}, {22, 0}};
 
 String inputString = "";
+int nextButtonMillis = millis();  // to control rebounds
 
 struct irrigationLine {
   bool configured;
@@ -85,6 +89,12 @@ void updateLines();
 bool checkCondition(float value, int op, float value2);
 bool checkCondition(bool value, int op, bool value2);
 
+// Callbacks for LCD buttons interrupts
+void btnBack();
+void btnDown();
+void btnUp();
+void btnForward();
+
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void sendCommands();
@@ -109,6 +119,12 @@ void setup() {
   //configure input/outputs and init values
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
+
+  for(int i=0; i < 4; i++) pinMode(BUTTONS_START_PIN + i, INPUT);
+  attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN), btnBack, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 1), btnDown, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 2), btnUp, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTONS_START_PIN + 3), btnForward, FALLING);
   
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     pinMode(IRRIGATION_START_PIN + numSensor, OUTPUT);
@@ -201,6 +217,36 @@ void loop() {
   delay(100);                        // wait for a second
   digitalWrite(LED_BUILTIN, HIGH);    // turn the LED off by making the voltage LOW
   delay(2000);
+}
+
+// -------------------------------------------------------------
+
+void btnBack() {
+  if(millis() > nextButtonMillis) {
+    Serial.println("Back button pressed");
+    nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+  }
+}
+
+void btnDown() {
+  if(millis() > nextButtonMillis) {
+    Serial.println("Down button pressed");
+    nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+  }
+}
+
+void btnUp() {
+  if(millis() > nextButtonMillis) {
+    Serial.println("Up button pressed");
+    nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+  }
+}
+
+void btnForward() {
+  if(millis() > nextButtonMillis) {
+    Serial.println("Forward button pressed");
+    nextButtonMillis = millis() + DEBOUNCE_MILLIS;
+  }
 }
 
 // -------------------------------------------------------------
