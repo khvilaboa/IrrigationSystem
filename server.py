@@ -3,7 +3,7 @@
 
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-import pdb, re, serial
+import pdb, re, serial, time
 
 updater = Updater(token='317355728:AAG02xTWXrL_Qr5QFE2SR22APSnMZn0RSew')  # @SEDIrrigationBot
 dispatcher = updater.dispatcher
@@ -123,9 +123,31 @@ class IrrigationSystem:
 		print(cmd)
 		self.serial.write(cmd)
 		
+	def conditions(self):
+		res = ""
+		for num_line in self.lines:
+			res += "Line %s:\n- Start: %s\n- Stop: %s\n\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
+		return res
+		
+	def request_lines(self):
+		self.serial.write(IrrigationSystem.CMD_REQUEST_COMMANDS)
+		
 	def update(self):
 		self.serial.write(IrrigationSystem.CMD_UPDATE)
 		
+	def update_line(self, num_line, start_cond, cond):
+		print(num_line, start_cond, cond)
+		#pdb.set_trace()
+		if num_line in self.lines:
+			if start_cond:
+				self.lines[num_line].start_cond = cond
+			else:
+				self.lines[num_line].stop_cond = cond
+		else:
+			if start_cond:
+				self.lines[num_line] = self.IrrigationLine(cond, cond)
+			else:
+				self.lines[num_line] = self.IrrigationLine(cond, cond)
 # ------------------------------------------------------------------------------------
 
 message = None
@@ -167,6 +189,12 @@ def set_start_condition(bot, update):
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
 	
+def show_conditions(bot, update):
+	conds = irrigation.conditions()
+	update.message.reply_text(conds or "No data")
+	
+def request_lines(bot, update):
+	irrigation.request_lines()
 	
 # Set stop condition for a line
 def set_stop_condition(bot, update):
@@ -203,12 +231,16 @@ if __name__ == "__main__":
 	dispatcher.add_handler(CommandHandler('start', start))
 	dispatcher.add_handler(CommandHandler('startCondition', set_start_condition))
 	dispatcher.add_handler(CommandHandler('stopCondition', set_stop_condition))
+	dispatcher.add_handler(CommandHandler('conditions', show_conditions))
 	dispatcher.add_handler(CommandHandler('updates', get_sensor_updates))
+	dispatcher.add_handler(CommandHandler('requestLines', request_lines))
 	dispatcher.add_handler(MessageHandler(Filters.text, text))
 	dispatcher.add_handler(MessageHandler(Filters.command, unknown))
 
 	updater.start_polling()  # Start the bot
 
+	time.sleep(1)
+	irrigation.request_lines()
 
 	# Loop to read arduino data via serial
 	while 1:
@@ -229,6 +261,16 @@ if __name__ == "__main__":
 				if updatesResp != "" and message is not None:
 					message.reply_text(updatesResp[:-1])
 					message = None
+				
+			if input.startswith("I;"):  # Init (Start)
+				elems = input.split(SERIAL_DELIM)
+				cond = Condition(*map(float,elems[-5:]))
+				irrigation.update_line(int(elems[1]), True, cond)
+				
+			if input.startswith("S;"):  # Stop
+				elems = input.split(SERIAL_DELIM)
+				cond = Condition(*map(float,elems[-5:]))
+				irrigation.update_line(int(elems[1]), False, cond)
 				
 		except serial.SerialTimeoutException:
 			print('Data could not be read')

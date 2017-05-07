@@ -121,6 +121,7 @@ void motorStep(int steps, bool inverse);
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void sendCommands();
+void sendCondtition(int numLine, bool startCond);
 void sendUpdates();
 
 // -------------------------------------------------------------
@@ -267,9 +268,9 @@ void motorStep(int steps, bool inverse) {
 // -------------------------------------------------------------
 
 void btnBack() {
-  Serial.print("<");
+  //Serial.print("<");
   if(millis() > nextButtonMillis) {
-    Serial.println("Back button pressed");
+    //Serial.println("Back button pressed");
     if(lcdState == SENSOR_STATUS) {
       lcdSelectedLine = -1;
       lcd.noCursor();
@@ -287,14 +288,14 @@ void btnBack() {
       updateLcd();
     }
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
-    Serial.println((String) millis() + ", " + nextButtonMillis);
+    //Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnDown() {
-  Serial.print("v");
+  //Serial.print("v");
   if(millis() > nextButtonMillis) {
-    Serial.println("Down button pressed");
+    //Serial.println("Down button pressed");
     if(lcdState == SENSOR_STATUS && lcdSelectedLine >= 0) {
       lcdSelectedLine--;
       if(lcdSelectedLine < 0) {
@@ -339,17 +340,18 @@ void btnDown() {
           }
         }
       }
+      sendCondtition(lcdSelectedLine, lcdStartCondition);
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
-    Serial.println((String) millis() + ", " + nextButtonMillis);
+    //Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnUp() {
-  Serial.print("^");
+  //Serial.print("^");
   if(millis() > nextButtonMillis) {
-    Serial.println("Up button pressed");
+    //Serial.println("Up button pressed");
     if(lcdState == SENSOR_STATUS && lcdSelectedLine < NUM_LINES - 1) {
       lcdSelectedLine++;
       lcd.setCursor(0, lcdSelectedLine);
@@ -390,18 +392,19 @@ void btnUp() {
           }
         }
       }
+      sendCondtition(lcdSelectedLine, lcdStartCondition);
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
-    Serial.println((String) millis() + ", " + nextButtonMillis);
+    //Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
 void btnForward() {
-  Serial.println((String) millis() + ", " + nextButtonMillis);
-  Serial.print(">");
+  //Serial.println((String) millis() + ", " + nextButtonMillis);
+  //Serial.print(">");
   if(millis() > nextButtonMillis) {
-    Serial.println("Forward button pressed");
+    //Serial.println("Forward button pressed");
     if(lcdState == SENSOR_STATUS && lcdSelectedLine != -1) {
       lcdState = MAIN_MENU;
     } else if(lcdState == MAIN_MENU) {
@@ -416,7 +419,7 @@ void btnForward() {
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
-    Serial.println((String) millis() + ", " + nextButtonMillis);
+    //Serial.println((String) millis() + ", " + nextButtonMillis);
   }
 }
 
@@ -527,7 +530,7 @@ void updateLines() {
     //delay(500); 
 
     // Start condition
-    Serial.println("Line (" + (String) numSensor + "):");
+    //Serial.println("Line (" + (String) numSensor + "):");
     cond1 = checkCondition(currentTemp, lines[numSensor].tempStartOp, lines[numSensor].tempStartThr);
     cond2 = checkCondition(currentHum, lines[numSensor].humStartOp, lines[numSensor].humStartThr);
     if(checkCondition(cond1, lines[numSensor].startMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
@@ -536,7 +539,7 @@ void updateLines() {
     cond1 = checkCondition(currentTemp, lines[numSensor].tempStopOp, lines[numSensor].tempStopThr);
     cond2 = checkCondition(currentHum, lines[numSensor].humStopOp, lines[numSensor].humStopThr);
     if(checkCondition(cond1, lines[numSensor].stopMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
-    Serial.println("");
+    //Serial.println("");
     
     /*if(currentTemp > lines[numSensor].tempStartThr) {  // Start condition
       digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
@@ -548,7 +551,7 @@ void updateLines() {
 }
 
 bool checkCondition(float value, int op, float value2) {
-  Serial.println("cond " + (String) value + ", " + (String) op + ", " + (String) value2 + " -> " + (String) ((op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2)));
+  //Serial.println("cond " + (String) value + ", " + (String) op + ", " + (String) value2 + " -> " + (String) ((op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2)));
   return (op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2);
 }
 
@@ -563,7 +566,6 @@ void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int 
   lines[numSensor].humStartOp = humOp;
   lines[numSensor].humStartThr = humValue;
   lines[numSensor].startMidOp = midOp;
-  Serial.println(midOp);
 
   // if the the line wans't previously configured init stop conditions to the start ones
   if(!lines[numSensor].configured) {
@@ -596,7 +598,33 @@ void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int h
 
 // Send all the commands via serial
 void sendCommands() {
-  
+  for(int numLine=0; numLine < NUM_LINES; numLine++) {
+    if(!lines[numLine].configured) continue;
+    sendCondtition(numLine, true);
+    sendCondtition(numLine, false);
+  }
+}
+
+void sendCondtition(int numLine, bool startCond) {
+  String cmd;
+
+  if(startCond) {
+    cmd = (String) CMD_SET_INIT + SERIAL_DELIM + (String) numLine + SERIAL_DELIM + 
+          (String) lines[numLine].tempStartOp + SERIAL_DELIM + 
+          (String) lines[numLine].tempStartThr + SERIAL_DELIM + 
+          (String) lines[numLine].startMidOp + SERIAL_DELIM +
+          (String) lines[numLine].humStartOp + SERIAL_DELIM + 
+          (String) lines[numLine].humStartThr; 
+  } else {  // Stop
+    cmd = (String) CMD_SET_STOP + SERIAL_DELIM + (String) numLine + SERIAL_DELIM + 
+          (String) lines[numLine].tempStopOp + SERIAL_DELIM + 
+          (String) lines[numLine].tempStopThr + SERIAL_DELIM + 
+          (String) lines[numLine].stopMidOp + SERIAL_DELIM +
+          (String) lines[numLine].humStopOp + SERIAL_DELIM + 
+          (String) lines[numLine].humStopThr; 
+  }
+
+  Serial.println(cmd);
 }
 
 // Send updated sensor reads
