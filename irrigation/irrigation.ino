@@ -39,11 +39,14 @@ const int OP_OR = 4;
 String inputString = "";
 long nextButtonMillis = millis();  // to control rebounds
 
-typedef enum {SENSOR_STATUS, MAIN_MENU} eLcdState;
+typedef enum {SENSOR_STATUS, MAIN_MENU, CONDITION_MENU} eLcdState;
 eLcdState lcdState = SENSOR_STATUS;
 int lcdSelectedLine = -1;
 int lcdMenuIndex = 0;
+int lcdMenuIndex2 = 0;
 bool lcdOptionSelected = false;
+int lcdOptionOffset = 0;
+bool lcdStartCondition = false;
 
 int motorStatus = 1;
 bool motorDir = false;
@@ -110,6 +113,7 @@ void btnForward();
 void updateLcd();
 void lcdSensorsStatus();
 void lcdMenu();
+void lcdCondition();
 
 // Motor
 void motorStep(int steps, bool inverse);
@@ -266,8 +270,20 @@ void btnBack() {
   Serial.print("<");
   if(millis() > nextButtonMillis) {
     Serial.println("Back button pressed");
-    if(lcdState == MAIN_MENU) {
+    if(lcdState == SENSOR_STATUS) {
+      lcdSelectedLine = -1;
+      lcd.noCursor();
+      updateLcd();
+    } else if(lcdOptionSelected) {
+      lcdOptionSelected = false;
+      lcdOptionOffset = 0;
+      updateLcd();
+    } else if(lcdState == MAIN_MENU) {
+      lcdMenuIndex = 0;
       lcdState = SENSOR_STATUS;
+      updateLcd();
+    } else if(lcdState == CONDITION_MENU) {
+      lcdState = MAIN_MENU;
       updateLcd();
     }
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -289,6 +305,40 @@ void btnDown() {
       }
     } else if(lcdState == MAIN_MENU && lcdMenuIndex > 0 && !lcdOptionSelected) {
       lcdMenuIndex--;
+    } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
+      lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
+    } else if(lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 > 0) {
+      lcdMenuIndex2--;
+    } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
+      if(lcdMenuIndex2 == 0) {
+        if(lcdOptionOffset == 1) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].tempStartOp = lines[lcdSelectedLine].tempStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+          } else {
+            lines[lcdSelectedLine].tempStopOp = lines[lcdSelectedLine].tempStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+          }
+        } if(lcdOptionOffset == 2) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].tempStartThr -= 0.1;
+          } else {
+            lines[lcdSelectedLine].tempStopThr -= 0.1;
+          }
+        }
+      } else { // lcdMenuIndex == 1
+        if(lcdOptionOffset == 1) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].humStartOp = lines[lcdSelectedLine].humStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+          } else {
+            lines[lcdSelectedLine].humStopOp = lines[lcdSelectedLine].humStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+          }
+        } if(lcdOptionOffset == 2) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].humStartThr -= 1;
+          } else {
+            lines[lcdSelectedLine].humStopThr -= 1;
+          }
+        }
+      }
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -304,8 +354,42 @@ void btnUp() {
       lcdSelectedLine++;
       lcd.setCursor(0, lcdSelectedLine);
       lcd.cursor();      
-    } else if(lcdState == MAIN_MENU && lcdMenuIndex < 2 && !lcdOptionSelected) {
+    } else if(lcdState == MAIN_MENU && !lcdOptionSelected && lcdMenuIndex < 2) {
       lcdMenuIndex++;
+    } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
+      lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
+    } else if(lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 < 1) {
+      lcdMenuIndex2++;
+    } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
+      if(lcdMenuIndex2 == 0) {
+        if(lcdOptionOffset == 1) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].tempStartOp = lines[lcdSelectedLine].tempStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+          } else {
+            lines[lcdSelectedLine].tempStopOp = lines[lcdSelectedLine].tempStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+          }
+        } if(lcdOptionOffset == 2) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].tempStartThr += 0.1;
+          } else {
+            lines[lcdSelectedLine].tempStopThr += 0.1;
+          }
+        }
+      } else { // lcdMenuIndex == 1
+        if(lcdOptionOffset == 1) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].humStartOp = lines[lcdSelectedLine].humStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+          } else {
+            lines[lcdSelectedLine].humStopOp = lines[lcdSelectedLine].humStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+          }
+        } if(lcdOptionOffset == 2) {
+          if(lcdStartCondition) {
+            lines[lcdSelectedLine].humStartThr += 1;
+          } else {
+            lines[lcdSelectedLine].humStopThr += 1;
+          }
+        }
+      }
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -321,7 +405,14 @@ void btnForward() {
     if(lcdState == SENSOR_STATUS && lcdSelectedLine != -1) {
       lcdState = MAIN_MENU;
     } else if(lcdState == MAIN_MENU) {
-      lcdOptionSelected = !lcdOptionSelected;
+      switch(lcdMenuIndex) {
+        case 0: lcdOptionSelected = !lcdOptionSelected; break;
+        case 1: lcdStartCondition = true; lcdState = CONDITION_MENU; break;
+        case 2: lcdStartCondition = false; lcdState = CONDITION_MENU; break;
+      }
+    } else if(lcdState == CONDITION_MENU) {
+      lcdOptionOffset = (lcdOptionOffset + 1) % 3;
+      lcdOptionSelected = lcdOptionOffset != 0;
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -333,15 +424,25 @@ void updateLcd() {
   switch(lcdState) {
     case SENSOR_STATUS: lcdSensorsStatus(); break;
     case MAIN_MENU: lcdMenu(); break;
+    case CONDITION_MENU: lcdCondition(); break;
   }
 
+  // Set cursor
   if(lcdState == SENSOR_STATUS && lcdSelectedLine != -1) {
     lcd.setCursor(0, lcdSelectedLine);
   } else if(lcdState == MAIN_MENU && !lcdOptionSelected) {
     lcd.setCursor(0, lcdMenuIndex);
-  } else if(lcdState == MAIN_MENU && lcdOptionSelected) {
-    switch(lcdMenuIndex) {
-      case 0: lcd.setCursor(9, 0); //Enabled
+  } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
+    lcd.setCursor(9, 0); // Enabled option
+  } else if(lcdState == CONDITION_MENU) {
+    if(lcdOptionSelected) {
+      if(lcdOptionOffset == 1) {
+        lcd.setCursor(8, lcdMenuIndex2 + 1);
+      } else if(lcdOptionOffset == 2) {
+        lcd.setCursor(10, lcdMenuIndex2 + 1);
+      }
+    } else {
+      lcd.setCursor(0, lcdMenuIndex2 + 1);
     }
   }
 }
@@ -366,6 +467,32 @@ void lcdMenu() {
   lcd.print("Start condition");
   lcd.setCursor(0, 2);
   lcd.print("Stop condition");
+}
+
+void lcdCondition() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  
+  float temp, tempOp, hum, humOp;
+  
+  if(lcdStartCondition) {
+    lcd.print("Start condition (" + (String) lcdSelectedLine + "):");
+    temp = lines[lcdSelectedLine].tempStartThr;
+    tempOp = lines[lcdSelectedLine].tempStartOp;
+    hum = lines[lcdSelectedLine].humStartThr;
+    humOp = lines[lcdSelectedLine].humStartOp;
+  } else {
+    lcd.print("Stop condition (" + (String) lcdSelectedLine + "):");
+    temp = lines[lcdSelectedLine].tempStopThr;
+    tempOp = lines[lcdSelectedLine].tempStopOp;
+    hum = lines[lcdSelectedLine].humStopThr;
+    humOp = lines[lcdSelectedLine].humStopOp;
+  }
+
+  lcd.setCursor(0, 1);
+  lcd.print("TEMP:   " + (String)(tempOp == OP_LESS ? "<" : ">") + " " + (String) temp + "C");
+  lcd.setCursor(0, 2);
+  lcd.print("HUM :   " + (String)(humOp == OP_LESS ? "<" : ">") + " " + (String) hum + "%");
 }
 
 // -------------------------------------------------------------
