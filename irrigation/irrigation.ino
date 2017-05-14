@@ -39,7 +39,7 @@ const int OP_OR = 4;
 String inputString = "";
 long nextButtonMillis = millis();  // to control rebounds
 
-typedef enum {SENSOR_STATUS, MAIN_MENU, CONDITION_MENU} eLcdState;
+typedef enum {SENSOR_STATUS, MAIN_MENU, CONDITION_MENU, GREENHOUSE_MENU} eLcdState;
 eLcdState lcdState = SENSOR_STATUS;
 int lcdSelectedLine = -1;
 int lcdMenuIndex = 0;
@@ -71,6 +71,13 @@ struct irrigationLine {
   float humStartThr;
   int humStopOp;
   float humStopThr;
+
+  // Greenhouse
+  bool hasGreenHouse;
+  float extStartTemp;
+  float extStopTemp;
+  float doorOpenTemp;
+  float doorCloseTemp;
 } lines[NUM_LINES];
 
 // Custom chars from arduino examples
@@ -178,6 +185,12 @@ void setup() {
   lines[0].humStopThr = 50;
   lines[0].humStopOp = OP_LESS;
   lines[0].stopMidOp = OP_OR;
+
+  lines[0].hasGreenHouse = true;
+  lines[0].extStartTemp = 25;
+  lines[0].extStopTemp = 24;
+  lines[0].doorOpenTemp = 24;
+  lines[0].doorCloseTemp = 23;
   
   lines[1].configured = true;
   lines[1].tempStartThr = 23;
@@ -191,6 +204,8 @@ void setup() {
   lines[1].humStopThr = 30;
   lines[1].humStopOp = OP_LESS;
   lines[1].stopMidOp = OP_AND;
+
+  lines[1].hasGreenHouse = false;
   
   for(int numSensor=2; numSensor < NUM_LINES; numSensor++) lines[numSensor].configured = false;
 
@@ -283,7 +298,7 @@ void btnBack() {
       lcdMenuIndex = 0;
       lcdState = SENSOR_STATUS;
       updateLcd();
-    } else if(lcdState == CONDITION_MENU) {
+    } else if(lcdState == CONDITION_MENU || lcdState == GREENHOUSE_MENU) {
       lcdState = MAIN_MENU;
       updateLcd();
     }
@@ -308,7 +323,7 @@ void btnDown() {
       lcdMenuIndex--;
     } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
       lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
-    } else if(lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 > 0) {
+    } else if((lcdState == CONDITION_MENU || lcdState == GREENHOUSE_MENU) && !lcdOptionSelected && lcdMenuIndex2 > 0) {
       lcdMenuIndex2--;
     } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
       if(lcdMenuIndex2 == 0) {
@@ -341,6 +356,22 @@ void btnDown() {
         }
       }
       sendCondtition(lcdSelectedLine, lcdStartCondition);
+    } else if(lcdState == GREENHOUSE_MENU && lcdOptionSelected) {
+      if(lcdMenuIndex2 == 0) {
+        lines[lcdSelectedLine].hasGreenHouse = !lines[lcdSelectedLine].hasGreenHouse;
+      } else if(lcdMenuIndex2 == 1) {
+        if(lcdOptionOffset == 1) {
+          lines[lcdSelectedLine].doorOpenTemp -= 0.1;
+        } else if(lcdOptionOffset == 2) {
+          lines[lcdSelectedLine].doorCloseTemp -= 0.1;
+        }
+      } else if(lcdMenuIndex2 == 2) {
+        if(lcdOptionOffset == 1) {
+          lines[lcdSelectedLine].extStartTemp -= 0.1;
+        } else if(lcdOptionOffset == 2) {
+          lines[lcdSelectedLine].extStopTemp -= 0.1;
+        }
+      }
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -356,11 +387,11 @@ void btnUp() {
       lcdSelectedLine++;
       lcd.setCursor(0, lcdSelectedLine);
       lcd.cursor();      
-    } else if(lcdState == MAIN_MENU && !lcdOptionSelected && lcdMenuIndex < 2) {
+    } else if(lcdState == MAIN_MENU && !lcdOptionSelected && lcdMenuIndex < 3) {
       lcdMenuIndex++;
     } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
       lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
-    } else if(lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 < 1) {
+    } else if((lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 < 1) || (lcdState == GREENHOUSE_MENU && !lcdOptionSelected && lcdMenuIndex2 < 2)) {
       lcdMenuIndex2++;
     } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
       if(lcdMenuIndex2 == 0) {
@@ -393,6 +424,22 @@ void btnUp() {
         }
       }
       sendCondtition(lcdSelectedLine, lcdStartCondition);
+    } else if(lcdState == GREENHOUSE_MENU && lcdOptionSelected) {
+      if(lcdMenuIndex2 == 0) {
+        lines[lcdSelectedLine].hasGreenHouse = !lines[lcdSelectedLine].hasGreenHouse;
+      } else if(lcdMenuIndex2 == 1) {
+        if(lcdOptionOffset == 1) {
+          lines[lcdSelectedLine].doorOpenTemp += 0.1;
+        } else if(lcdOptionOffset == 2) {
+          lines[lcdSelectedLine].doorCloseTemp += 0.1;
+        }
+      } else if(lcdMenuIndex2 == 2) {
+        if(lcdOptionOffset == 1) {
+          lines[lcdSelectedLine].extStartTemp += 0.1;
+        } else if(lcdOptionOffset == 2) {
+          lines[lcdSelectedLine].extStopTemp += 0.1;
+        }
+      }
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -412,10 +459,16 @@ void btnForward() {
         case 0: lcdOptionSelected = !lcdOptionSelected; break;
         case 1: lcdStartCondition = true; lcdState = CONDITION_MENU; break;
         case 2: lcdStartCondition = false; lcdState = CONDITION_MENU; break;
+        case 3: lcdState = GREENHOUSE_MENU; break;
       }
     } else if(lcdState == CONDITION_MENU) {
       lcdOptionOffset = (lcdOptionOffset + 1) % 3;
       lcdOptionSelected = lcdOptionOffset != 0;
+    } else if(lcdState == GREENHOUSE_MENU) {
+      switch(lcdMenuIndex2) {
+        case 0: lcdOptionSelected = !lcdOptionSelected; break;
+        case 1: case 2: lcdOptionOffset = (lcdOptionOffset + 1) % 3; lcdOptionSelected = lcdOptionOffset != 0; break;
+      }
     }
     updateLcd();
     nextButtonMillis = millis() + DEBOUNCE_MILLIS;
@@ -428,6 +481,7 @@ void updateLcd() {
     case SENSOR_STATUS: lcdSensorsStatus(); break;
     case MAIN_MENU: lcdMenu(); break;
     case CONDITION_MENU: lcdCondition(); break;
+    case GREENHOUSE_MENU: lcdGreenhouse(); break;
   }
 
   // Set cursor
@@ -446,6 +500,18 @@ void updateLcd() {
       }
     } else {
       lcd.setCursor(0, lcdMenuIndex2 + 1);
+    }
+  } else if(lcdState == GREENHOUSE_MENU && lcdOptionSelected && lcdMenuIndex2 == 0) {
+    lcd.setCursor(9, 0); // Enabled option
+  } else if(lcdState == GREENHOUSE_MENU) {
+    if(lcdOptionSelected) {
+      if(lcdOptionOffset == 1) {
+        lcd.setCursor(6, lcdMenuIndex2);
+      } else if(lcdOptionOffset == 2) {
+        lcd.setCursor(15, lcdMenuIndex2);
+      }
+    } else {
+      lcd.setCursor(0, lcdMenuIndex2);
     }
   }
 }
@@ -470,6 +536,8 @@ void lcdMenu() {
   lcd.print("Start condition");
   lcd.setCursor(0, 2);
   lcd.print("Stop condition");
+  lcd.setCursor(0, 3);
+  lcd.print("Greenhouse");
 }
 
 void lcdCondition() {
@@ -496,6 +564,18 @@ void lcdCondition() {
   lcd.print("TEMP:   " + (String)(tempOp == OP_LESS ? "<" : ">") + " " + (String) temp + "C");
   lcd.setCursor(0, 2);
   lcd.print("HUM :   " + (String)(humOp == OP_LESS ? "<" : ">") + " " + (String) hum + "%");
+}
+
+void lcdGreenhouse() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Enabled: " + (String)(lines[lcdSelectedLine].hasGreenHouse?"Yes":"No"));
+  lcd.setCursor(0, 1);
+  lcd.print("Door: " + (String)(lines[lcdSelectedLine].doorOpenTemp) + " -> " + (String)(lines[lcdSelectedLine].doorCloseTemp));
+  lcd.setCursor(0, 2);
+  lcd.print("Extr: " + (String)(lines[lcdSelectedLine].extStartTemp) + " -> " + (String)(lines[lcdSelectedLine].extStopTemp));
+  lcd.setCursor(0, 3);
+  lcd.print((String)(lcdOptionOffset));
 }
 
 // -------------------------------------------------------------
