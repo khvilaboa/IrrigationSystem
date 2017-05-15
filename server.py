@@ -95,6 +95,8 @@ class IrrigationSystem:
 	CMD_SET_STOP = 'S';
 	CMD_REQUEST_COMMANDS = 'R';
 	CMD_UPDATE = 'U';
+	CMD_ENABLE_GREENHOUSE = 'G';
+	CMD_DISABLE_GREENHOUSE = 'H';
 
 	class IrrigationLine:
 		def __init__(self, start_cond, stop_cond):
@@ -154,6 +156,13 @@ class IrrigationSystem:
 				self.lines[num_line] = self.IrrigationLine(cond, cond)
 			else:
 				self.lines[num_line] = self.IrrigationLine(cond, cond)
+				
+	def enable_greenhouse(self, num_line):
+		self.serial.write("%s;%d" % (IrrigationSystem.CMD_ENABLE_GREENHOUSE, num_line))
+		
+	def disable_greenhouse(self, num_line):
+		self.serial.write("%s;%d" % (IrrigationSystem.CMD_DISABLE_GREENHOUSE, num_line))
+		
 # ------------------------------------------------------------------------------------
 
 message = None
@@ -298,6 +307,30 @@ def remove_user(bot, update):
 		print(e)
 		
 	update.message.reply_text(s)
+	
+def enable_greenhouse(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		irrigation.enable_greenhouse(int(textSp[1]))
+	except:
+		update.message.reply_text(DIC["comm_error"])
+		
+def disable_greenhouse(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		irrigation.disable_greenhouse(int(textSp[1]))
+	except:
+		update.message.reply_text(DIC["comm_error"])
+	
+	
 # ------------------------------------------------------------------------------------
 		
 if __name__ == "__main__":
@@ -312,6 +345,9 @@ if __name__ == "__main__":
 	dispatcher.add_handler(CommandHandler('users', list_users))
 	dispatcher.add_handler(CommandHandler('addUser', add_user))
 	dispatcher.add_handler(CommandHandler('removeUser', remove_user))
+	
+	dispatcher.add_handler(CommandHandler('enableGreenhouse', enable_greenhouse))
+	dispatcher.add_handler(CommandHandler('disableGreenhouse', disable_greenhouse))
 	
 	dispatcher.add_handler(MessageHandler(Filters.text, text))
 	dispatcher.add_handler(MessageHandler(Filters.command, unknown))
