@@ -406,7 +406,13 @@ void btnDown() {
       sendCondtition(lcdSelectedLine, lcdStartCondition);
     } else if(lcdState == GREENHOUSE_MENU && lcdOptionSelected) {
       if(lcdMenuIndex2 == 0) {
-        lines[lcdSelectedLine].hasGreenHouse = !lines[lcdSelectedLine].hasGreenHouse;
+        if(lines[lcdSelectedLine].hasGreenHouse) {
+          lines[lcdSelectedLine].hasGreenHouse = false;
+          sendGreenhouseDisabled(lcdSelectedLine);
+        } else {
+          lines[lcdSelectedLine].hasGreenHouse = true;
+          sendGreenhouseEnabled(lcdSelectedLine);
+        }
       } else if(lcdMenuIndex2 == 1) {
         if(lcdOptionOffset == 1) {
           lines[lcdSelectedLine].doorOpenTemp -= 0.1;
@@ -482,7 +488,13 @@ void btnUp() {
       sendCondtition(lcdSelectedLine, lcdStartCondition);
     } else if(lcdState == GREENHOUSE_MENU && lcdOptionSelected) {
       if(lcdMenuIndex2 == 0) {
-        lines[lcdSelectedLine].hasGreenHouse = !lines[lcdSelectedLine].hasGreenHouse;
+        if(lines[lcdSelectedLine].hasGreenHouse) {
+          lines[lcdSelectedLine].hasGreenHouse = false;
+          sendGreenhouseDisabled(lcdSelectedLine);
+        } else {
+          lines[lcdSelectedLine].hasGreenHouse = true;
+          sendGreenhouseEnabled(lcdSelectedLine);
+        }
       } else if(lcdMenuIndex2 == 1) {
         if(lcdOptionOffset == 1) {
           lines[lcdSelectedLine].doorOpenTemp += 0.1;
@@ -779,6 +791,12 @@ void sendCommands() {
       sendLineEnabled(numLine);
     } else {
       sendLineDisabled(numLine);
+    }
+
+    if(lines[numLine].hasGreenHouse) {
+      sendGreenhouseEnabled(numLine);
+    } else {
+      sendGreenhouseDisabled(numLine);
     }
   }
 }

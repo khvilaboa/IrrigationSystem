@@ -107,6 +107,7 @@ class IrrigationSystem:
 			self.start_cond = start_cond
 			self.stop_cond = stop_cond
 			self.enabled_line = False
+			self.has_greenhouse = False
 			self.door_temp_open = None
 			self.door_temp_close = None
 			self.ext_temp_start = None
@@ -144,7 +145,10 @@ class IrrigationSystem:
 		res = ""
 		for num_line in self.lines:
 			if self.lines[num_line].enabled_line:
-				res += "Line %s:\n- Start: %s\n- Stop: %s\n\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
+				res += "Line %s:\n- Start: %s\n- Stop: %s\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
+				if self.lines[num_line].has_greenhouse:
+					res += "- Greenhouse enabled\n"
+				res += "\n"
 		return res
 		
 	def greenhouse_info(self, num_line):
@@ -201,6 +205,9 @@ class IrrigationSystem:
 		
 	def active_line(self, num_line, enabled):
 		self.lines[num_line].enabled_line = enabled
+		
+	def has_greenhouse(self, num_line, enabled):
+		self.lines[num_line].has_greenhouse = enabled
 		
 # ------------------------------------------------------------------------------------
 
@@ -506,6 +513,14 @@ if __name__ == "__main__":
 			elif input.startswith("M;"):  # Line disabled
 				elems = input.split(SERIAL_DELIM)
 				irrigation.active_line(int(elems[1]), False)
+				
+			elif input.startswith("G;"):  # Line enabled
+				elems = input.split(SERIAL_DELIM)
+				irrigation.has_greenhouse(int(elems[1]), True)
+				
+			elif input.startswith("H;"):  # Line disabled
+				elems = input.split(SERIAL_DELIM)
+				irrigation.has_greenhouse(int(elems[1]), False)
 				
 		except serial.SerialTimeoutException:
 			print('Data could not be read')
