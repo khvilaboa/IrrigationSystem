@@ -149,6 +149,11 @@ void disableLine(int numLine);
 void doorTemps(int numLine, float openTemp, float closeTemp);
 void extTemps(int numLine, float startTemp, float stopTemp);
 
+void sendLineEnabled(int numLine);
+void sendLineDisabled(int numLine);
+void sendGreenhouseEnabled(int numLine);
+void sendGreenhouseDisabled(int numLine);
+
 void sendCommands();
 void sendCondtition(int numLine, bool startCond);
 void sendUpdates();
@@ -359,7 +364,13 @@ void btnDown() {
     } else if(lcdState == MAIN_MENU && lcdMenuIndex > 0 && !lcdOptionSelected) {
       lcdMenuIndex--;
     } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
-      lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
+      if(lines[lcdSelectedLine].configured) {
+        lines[lcdSelectedLine].configured = false;
+        sendLineDisabled(lcdSelectedLine);
+      } else {
+        lines[lcdSelectedLine].configured = true;
+        sendLineEnabled(lcdSelectedLine);
+      }
     } else if((lcdState == CONDITION_MENU || lcdState == GREENHOUSE_MENU) && !lcdOptionSelected && lcdMenuIndex2 > 0) {
       lcdMenuIndex2--;
     } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
@@ -429,7 +440,13 @@ void btnUp() {
     } else if(lcdState == MAIN_MENU && !lcdOptionSelected && lcdMenuIndex < 3) {
       lcdMenuIndex++;
     } else if(lcdState == MAIN_MENU && lcdOptionSelected && lcdMenuIndex == 0) {
-      lines[lcdSelectedLine].configured = !lines[lcdSelectedLine].configured;
+      if(lines[lcdSelectedLine].configured) {
+        lines[lcdSelectedLine].configured = false;
+        sendLineDisabled(lcdSelectedLine);
+      } else {
+        lines[lcdSelectedLine].configured = true;
+        sendLineEnabled(lcdSelectedLine);
+      }
     } else if((lcdState == CONDITION_MENU && !lcdOptionSelected && lcdMenuIndex2 < 1) || (lcdState == GREENHOUSE_MENU && !lcdOptionSelected && lcdMenuIndex2 < 2)) {
       lcdMenuIndex2++;
     } else if(lcdState == CONDITION_MENU && lcdOptionSelected) {
@@ -754,11 +771,15 @@ void extTemps(int numLine, float startTemp, float stopTemp) {
 // Send all the commands via serial
 void sendCommands() {
   for(int numLine=0; numLine < NUM_LINES; numLine++) {
-    if(!lines[numLine].configured) continue;
     sendCondtition(numLine, true);
     sendCondtition(numLine, false);
     sendDoorTemps(numLine);
     sendExtTemps(numLine);
+    if(lines[numLine].configured) {
+      sendLineEnabled(numLine);
+    } else {
+      sendLineDisabled(numLine);
+    }
   }
 }
 
@@ -776,6 +797,22 @@ void sendExtTemps(int numLine) {
         (String) lines[numLine].extStopTemp;
 
   Serial.println(cmd);
+}
+
+void sendLineEnabled(int numLine) {
+  Serial.println((String) CMD_ENABLE_LINE + SERIAL_DELIM + (String) numLine);
+}
+
+void sendLineDisabled(int numLine) {
+  Serial.println((String) CMD_DISABLE_LINE + SERIAL_DELIM + (String) numLine);
+}
+
+void sendGreenhouseEnabled(int numLine) {
+  Serial.println((String) CMD_ENABLE_GREENHOUSE + SERIAL_DELIM + (String) numLine);
+}
+
+void sendGreenhouseDisabled(int numLine) {
+  Serial.println((String) CMD_DISABLE_GREENHOUSE + SERIAL_DELIM + (String) numLine);
 }
 
 void sendCondtition(int numLine, bool startCond) {

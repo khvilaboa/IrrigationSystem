@@ -106,6 +106,7 @@ class IrrigationSystem:
 		def __init__(self, start_cond = None, stop_cond = None):
 			self.start_cond = start_cond
 			self.stop_cond = stop_cond
+			self.enabled_line = False
 			self.door_temp_open = None
 			self.door_temp_close = None
 			self.ext_temp_start = None
@@ -142,7 +143,8 @@ class IrrigationSystem:
 	def conditions(self):
 		res = ""
 		for num_line in self.lines:
-			res += "Line %s:\n- Start: %s\n- Stop: %s\n\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
+			if self.lines[num_line].enabled_line:
+				res += "Line %s:\n- Start: %s\n- Stop: %s\n\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
 		return res
 		
 	def greenhouse_info(self, num_line):
@@ -196,6 +198,9 @@ class IrrigationSystem:
 		
 	def ext_temps(self, num_line, start_temp, stop_temp):
 		self.serial.write("%s;%d;%f;%f" % (IrrigationSystem.CMD_EXT_TEMPS, num_line, start_temp, stop_temp))
+		
+	def active_line(self, num_line, enabled):
+		self.lines[num_line].enabled_line = enabled
 		
 # ------------------------------------------------------------------------------------
 
@@ -484,15 +489,23 @@ if __name__ == "__main__":
 				cond = Condition(*map(float,elems[-5:]))
 				irrigation.update_line(int(elems[1]), False, cond)
 				
-			elif input.startswith("D;"):  # Stop
+			elif input.startswith("D;"):  # Door temps
 				elems = input.split(SERIAL_DELIM)
 				temps = [int(elems[1])] + map(float, elems[2:])
 				irrigation.update_door_temps(*temps)
 				
-			elif input.startswith("E;"):  # Stop
+			elif input.startswith("E;"):  # Extractor temps
 				elems = input.split(SERIAL_DELIM)
 				temps = [int(elems[1])] + map(float, elems[2:])
 				irrigation.update_ext_temps(*temps)
+				
+			elif input.startswith("L;"):  # Line enabled
+				elems = input.split(SERIAL_DELIM)
+				irrigation.active_line(int(elems[1]), True)
+				
+			elif input.startswith("M;"):  # Line disabled
+				elems = input.split(SERIAL_DELIM)
+				irrigation.active_line(int(elems[1]), False)
 				
 		except serial.SerialTimeoutException:
 			print('Data could not be read')
