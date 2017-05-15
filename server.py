@@ -99,6 +99,8 @@ class IrrigationSystem:
 	CMD_DISABLE_GREENHOUSE = 'H';
 	CMD_ENABLE_LINE = 'L';
 	CMD_DISABLE_LINE = 'M';
+	CMD_DOOR_TEMPS = "D";
+	CMD_EXT_TEMPS = "E";
 
 	class IrrigationLine:
 		def __init__(self, start_cond, stop_cond):
@@ -170,6 +172,12 @@ class IrrigationSystem:
 		
 	def disable_line(self, num_line):
 		self.serial.write("%s;%d" % (IrrigationSystem.CMD_DISABLE_LINE, num_line))
+		
+	def door_temps(self, num_line, start_temp, stop_temp):
+		self.serial.write("%s;%d;%f;%f" % (IrrigationSystem.CMD_DOOR_TEMPS, num_line, start_temp, stop_temp))
+		
+	def ext_temps(self, num_line, start_temp, stop_temp):
+		self.serial.write("%s;%d;%f;%f" % (IrrigationSystem.CMD_EXT_TEMPS, num_line, start_temp, stop_temp))
 		
 # ------------------------------------------------------------------------------------
 
@@ -359,6 +367,28 @@ def disable_line(bot, update):
 		irrigation.disable_line(int(textSp[1]))
 	except:
 		update.message.reply_text(DIC["comm_error"])
+		
+def door_temps(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		irrigation.door_temps(int(textSp[1]), float(textSp[2]), float(textSp[3]))
+	except:
+		update.message.reply_text(DIC["comm_error"])
+		
+def ext_temps(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		irrigation.ext_temps(int(textSp[1]), float(textSp[2]), float(textSp[3]))
+	except:
+		update.message.reply_text(DIC["comm_error"])
 	
 # ------------------------------------------------------------------------------------
 		
@@ -380,6 +410,9 @@ if __name__ == "__main__":
 	
 	dispatcher.add_handler(CommandHandler('enableLine', enable_line))
 	dispatcher.add_handler(CommandHandler('disableLine', disable_line))
+	
+	dispatcher.add_handler(CommandHandler('doorTemps', door_temps))
+	dispatcher.add_handler(CommandHandler('extTemps', ext_temps))
 	
 	dispatcher.add_handler(MessageHandler(Filters.text, text))
 	dispatcher.add_handler(MessageHandler(Filters.command, unknown))

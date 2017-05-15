@@ -28,6 +28,8 @@ const char CMD_ENABLE_GREENHOUSE = 'G';
 const char CMD_DISABLE_GREENHOUSE = 'H';
 const char CMD_ENABLE_LINE = 'L';
 const char CMD_DISABLE_LINE = 'M';
+const char CMD_DOOR_TEMPS = 'D';
+const char CMD_EXT_TEMPS = 'E';
 
 const int OP_NONE = 0;
 const int OP_LESS = 1;
@@ -143,6 +145,9 @@ void enableGreenhouse(int numLine);
 void disableGreenhouse(int numLine);
 void enableLine(int numLine);
 void disableLine(int numLine);
+
+void doorTemps(int numLine, float openTemp, float closeTemp);
+void extTemps(int numLine, float startTemp, float stopTemp);
 
 void sendCommands();
 void sendCondtition(int numLine, bool startCond);
@@ -732,6 +737,16 @@ void disableLine(int numLine) {
   lines[numLine].configured = false;
 }
 
+void doorTemps(int numLine, float openTemp, float closeTemp) {
+  lines[numLine].doorOpenTemp = openTemp;
+  lines[numLine].doorCloseTemp = closeTemp;
+}
+
+void extTemps(int numLine, float startTemp, float stopTemp) {
+  lines[numLine].extStartTemp = startTemp;
+  lines[numLine].extStopTemp = stopTemp;
+}
+
 // Send all the commands via serial
 void sendCommands() {
   for(int numLine=0; numLine < NUM_LINES; numLine++) {
@@ -823,6 +838,12 @@ void serialEvent() {
     enableLine(frags[1].toInt());
   } else if(numFrag == 2 && cmd == CMD_DISABLE_LINE) {
     disableLine(frags[1].toInt());
+  } else if(numFrag == 4 && cmd == CMD_DOOR_TEMPS) {
+    doorTemps(frags[1].toInt(), frags[2].toFloat(), frags[3].toFloat());
+  } else if(numFrag == 4 && cmd == CMD_EXT_TEMPS) {
+    extTemps(frags[1].toInt(), frags[2].toFloat(), frags[3].toFloat());
   }
+
+  
 }
 
