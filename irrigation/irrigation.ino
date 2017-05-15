@@ -26,6 +26,8 @@ const char CMD_REQUEST_COMMANDS = 'R';
 const char CMD_UPDATE = 'U';
 const char CMD_ENABLE_GREENHOUSE = 'G';
 const char CMD_DISABLE_GREENHOUSE = 'H';
+const char CMD_ENABLE_LINE = 'L';
+const char CMD_DISABLE_LINE = 'M';
 
 const int OP_NONE = 0;
 const int OP_LESS = 1;
@@ -139,6 +141,8 @@ void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int h
 
 void enableGreenhouse(int numLine);
 void disableGreenhouse(int numLine);
+void enableLine(int numLine);
+void disableLine(int numLine);
 
 void sendCommands();
 void sendCondtition(int numLine, bool startCond);
@@ -720,6 +724,14 @@ void disableGreenhouse(int numLine) {
   lines[numLine].hasGreenHouse = false;
 }
 
+void enableLine(int numLine) {
+  lines[numLine].configured = true;
+}
+
+void disableLine(int numLine) {
+  lines[numLine].configured = false;
+}
+
 // Send all the commands via serial
 void sendCommands() {
   for(int numLine=0; numLine < NUM_LINES; numLine++) {
@@ -807,6 +819,10 @@ void serialEvent() {
     enableGreenhouse(frags[1].toInt());
   } else if(numFrag == 2 && cmd == CMD_DISABLE_GREENHOUSE) {
     disableGreenhouse(frags[1].toInt());
+  } else if(numFrag == 2 && cmd == CMD_ENABLE_LINE) {
+    enableLine(frags[1].toInt());
+  } else if(numFrag == 2 && cmd == CMD_DISABLE_LINE) {
+    disableLine(frags[1].toInt());
   }
 }
 
