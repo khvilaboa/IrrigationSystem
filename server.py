@@ -103,9 +103,13 @@ class IrrigationSystem:
 	CMD_EXT_TEMPS = "E";
 
 	class IrrigationLine:
-		def __init__(self, start_cond, stop_cond):
+		def __init__(self, start_cond = None, stop_cond = None):
 			self.start_cond = start_cond
 			self.stop_cond = stop_cond
+			self.door_temp_open = None
+			self.door_temp_close = None
+			self.ext_temp_start = None
+			self.ext_temp_stop = None
 	
 	def __init__(self, port):
 		self.serial = serial.Serial(port, 9600)
@@ -141,6 +145,12 @@ class IrrigationSystem:
 			res += "Line %s:\n- Start: %s\n- Stop: %s\n\n" % (num_line, self.lines[num_line].start_cond, self.lines[num_line].stop_cond)
 		return res
 		
+	def greenhouse_info(self, num_line):
+		res = "Line %d (greenhouse)" % num_line
+		res += "\nDoor:  %.2f (start), %.2f (stop)" % (self.lines[num_line].door_temp_open or 0, self.lines[num_line].door_temp_close or 0)
+		res += "\nExtr:  %.2f (start), %.2f (stop)" % (self.lines[num_line].ext_temp_start or 0, self.lines[num_line].ext_temp_stop or 0)
+		return res
+		
 	def request_lines(self):
 		self.serial.write(IrrigationSystem.CMD_REQUEST_COMMANDS)
 		
@@ -160,6 +170,14 @@ class IrrigationSystem:
 				self.lines[num_line] = self.IrrigationLine(cond, cond)
 			else:
 				self.lines[num_line] = self.IrrigationLine(cond, cond)
+				
+	def update_door_temps(self, num_line, open_temp, close_temp):
+		self.lines[num_line].door_temp_open = open_temp
+		self.lines[num_line].door_temp_close = close_temp
+		
+	def update_ext_temps(self, num_line, start_temp, stop_temp):
+		self.lines[num_line].ext_temp_start = start_temp
+		self.lines[num_line].ext_temp_stop = stop_temp
 				
 	def enable_greenhouse(self, num_line):
 		self.serial.write("%s;%d" % (IrrigationSystem.CMD_ENABLE_GREENHOUSE, num_line))
@@ -389,6 +407,18 @@ def ext_temps(bot, update):
 		irrigation.ext_temps(int(textSp[1]), float(textSp[2]), float(textSp[3]))
 	except:
 		update.message.reply_text(DIC["comm_error"])
+		
+def greenhouse_info(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+
+	try:
+		textSp = update.message.text.split()	
+		gi = irrigation.greenhouse_info(int(textSp[1]))
+		update.message.reply_text(gi or "No data")
+	except Exception as e:
+		update.message.reply_text(DIC["comm_error"])
 	
 # ------------------------------------------------------------------------------------
 		
@@ -413,6 +443,8 @@ if __name__ == "__main__":
 	
 	dispatcher.add_handler(CommandHandler('doorTemps', door_temps))
 	dispatcher.add_handler(CommandHandler('extTemps', ext_temps))
+	
+	dispatcher.add_handler(CommandHandler('greenhouse', greenhouse_info))
 	
 	dispatcher.add_handler(MessageHandler(Filters.text, text))
 	dispatcher.add_handler(MessageHandler(Filters.command, unknown))
@@ -442,15 +474,25 @@ if __name__ == "__main__":
 					message.reply_text(updatesResp[:-1])
 					message = None
 				
-			if input.startswith("I;"):  # Init (Start)
+			elif input.startswith("I;"):  # Init (Start)
 				elems = input.split(SERIAL_DELIM)
 				cond = Condition(*map(float,elems[-5:]))
 				irrigation.update_line(int(elems[1]), True, cond)
 				
-			if input.startswith("S;"):  # Stop
+			elif input.startswith("S;"):  # Stop
 				elems = input.split(SERIAL_DELIM)
 				cond = Condition(*map(float,elems[-5:]))
 				irrigation.update_line(int(elems[1]), False, cond)
+				
+			elif input.startswith("D;"):  # Stop
+				elems = input.split(SERIAL_DELIM)
+				temps = [int(elems[1])] + map(float, elems[2:])
+				irrigation.update_door_temps(*temps)
+				
+			elif input.startswith("E;"):  # Stop
+				elems = input.split(SERIAL_DELIM)
+				temps = [int(elems[1])] + map(float, elems[2:])
+				irrigation.update_ext_temps(*temps)
 				
 		except serial.SerialTimeoutException:
 			print('Data could not be read')

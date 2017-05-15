@@ -402,12 +402,14 @@ void btnDown() {
         } else if(lcdOptionOffset == 2) {
           lines[lcdSelectedLine].doorCloseTemp -= 0.1;
         }
+        sendDoorTemps(lcdSelectedLine);
       } else if(lcdMenuIndex2 == 2) {
         if(lcdOptionOffset == 1) {
           lines[lcdSelectedLine].extStartTemp -= 0.1;
         } else if(lcdOptionOffset == 2) {
           lines[lcdSelectedLine].extStopTemp -= 0.1;
         }
+        sendExtTemps(lcdSelectedLine);
       }
     }
     updateLcd();
@@ -470,12 +472,14 @@ void btnUp() {
         } else if(lcdOptionOffset == 2) {
           lines[lcdSelectedLine].doorCloseTemp += 0.1;
         }
+        sendDoorTemps(lcdSelectedLine);
       } else if(lcdMenuIndex2 == 2) {
         if(lcdOptionOffset == 1) {
           lines[lcdSelectedLine].extStartTemp += 0.1;
         } else if(lcdOptionOffset == 2) {
           lines[lcdSelectedLine].extStopTemp += 0.1;
         }
+        sendExtTemps(lcdSelectedLine);
       }
     }
     updateLcd();
@@ -753,7 +757,25 @@ void sendCommands() {
     if(!lines[numLine].configured) continue;
     sendCondtition(numLine, true);
     sendCondtition(numLine, false);
+    sendDoorTemps(numLine);
+    sendExtTemps(numLine);
   }
+}
+
+void sendDoorTemps(int numLine) {
+  String cmd = (String) CMD_DOOR_TEMPS + SERIAL_DELIM + (String) numLine + SERIAL_DELIM + 
+        (String) lines[numLine].doorOpenTemp + SERIAL_DELIM + 
+        (String) lines[numLine].doorCloseTemp;
+
+  Serial.println(cmd);
+}
+
+void sendExtTemps(int numLine) {
+  String cmd = (String) CMD_EXT_TEMPS + SERIAL_DELIM + (String) numLine + SERIAL_DELIM + 
+        (String) lines[numLine].extStartTemp + SERIAL_DELIM + 
+        (String) lines[numLine].extStopTemp;
+
+  Serial.println(cmd);
 }
 
 void sendCondtition(int numLine, bool startCond) {
