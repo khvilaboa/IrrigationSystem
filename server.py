@@ -18,7 +18,13 @@ SPANISH_DIC = {
 	"unknown_cmd": "Comando no reconocido",
 	"cond_success": "Condición establecida",
 	"comm_error": "No se pudo establecer la conexión",
-	"line": "Línea"
+	"line": "Línea",
+	"user_not_allowed": "No estás autorizado a interactuar con el sistema",
+	"allowed_users": "Usuarios autorizados:",
+	"user_added": "Usuario añadido correctamente",
+	"user_removed": "Usuario eliminado correctamente",
+	"user_already_added": "El usuario especificado ya tiene privilegios",
+	"user_unknown": "El usuario especificado no está en la lista de usuarios con privilegios"
 }
 
 DIC = SPANISH_DIC
@@ -153,6 +159,8 @@ class IrrigationSystem:
 message = None
 irrigation = IrrigationSystem("COM7");
 
+allowed_users = ["khvilaboa"]
+
 # Default command (executed on bot init)
 def start(bot, update):
 	update.message.reply_text("Hola :)")
@@ -171,6 +179,10 @@ def unknown(bot, update):
 	
 # Set start condition for a line
 def set_start_condition(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
 	print("\nReceived (start): %s" % update.message.text)
 	
 	try:
@@ -190,14 +202,26 @@ def set_start_condition(bot, update):
 		print(e)
 	
 def show_conditions(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
 	conds = irrigation.conditions()
 	update.message.reply_text(conds or "No data")
 	
 def request_lines(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
 	irrigation.request_lines()
 	
 # Set stop condition for a line
 def set_stop_condition(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
 	print("\nReceived (stop): %s" % update.message.text)
 	
 	try:
@@ -215,6 +239,10 @@ def set_stop_condition(bot, update):
 	
 # Request sensor updates (for all the lines)
 def get_sensor_updates(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
 	global message
 	message = update.message
 	
@@ -224,6 +252,52 @@ def get_sensor_updates(bot, update):
 		update.message.reply_text(DIC["comm_error"])
 		print(e)
 
+def list_users(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	s = DIC["allowed_users"]
+	for user in allowed_users:
+		s += "\n- %s" % user
+		
+	update.message.reply_text(s)
+	
+def add_user(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		if textSp[1] not in allowed_users:
+			update.message.reply_text(DIC["user_added"])
+			allowed_users.append(textSp[1])
+		else:
+			update.message.reply_text(DIC["user_already_added"])
+	except:
+		update.message.reply_text(DIC["comm_error"])
+		print(e)
+		
+	update.message.reply_text(s)
+	
+def remove_user(bot, update):
+	if update.message.chat.username not in allowed_users:
+		update.message.reply_text(DIC["user_not_allowed"])
+		return
+		
+	try:
+		textSp = update.message.text.split()
+		if textSp[1] in allowed_users:
+			update.message.reply_text(DIC["user_removed"])
+			allowed_users.remove(textSp[1])
+		else:
+			update.message.reply_text(DIC["user_unknown"])
+	except:
+		update.message.reply_text(DIC["comm_error"])
+		print(e)
+		
+	update.message.reply_text(s)
 # ------------------------------------------------------------------------------------
 		
 if __name__ == "__main__":
@@ -234,6 +308,11 @@ if __name__ == "__main__":
 	dispatcher.add_handler(CommandHandler('conditions', show_conditions))
 	dispatcher.add_handler(CommandHandler('updates', get_sensor_updates))
 	dispatcher.add_handler(CommandHandler('requestLines', request_lines))
+	
+	dispatcher.add_handler(CommandHandler('users', list_users))
+	dispatcher.add_handler(CommandHandler('addUser', add_user))
+	dispatcher.add_handler(CommandHandler('removeUser', remove_user))
+	
 	dispatcher.add_handler(MessageHandler(Filters.text, text))
 	dispatcher.add_handler(MessageHandler(Filters.command, unknown))
 
