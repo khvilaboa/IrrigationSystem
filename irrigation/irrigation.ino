@@ -9,6 +9,7 @@ const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 const int BUTTONS_START_PIN = 18; // Buttons to handle LCD
 const int MOTOR_START_PIN = 47; // Step motor
+const int MOTOR_EXT_PIN = 34;
 
 const int DEBOUNCE_MILLIS = 200; // Millis to wait in a button interrupt to handle debounce
 
@@ -76,8 +77,10 @@ struct irrigationLine {
   bool hasGreenHouse;
   float extStartTemp;
   float extStopTemp;
+  bool extStarted;
   float doorOpenTemp;
   float doorCloseTemp;
+  bool doorOpened;
 } lines[NUM_LINES];
 
 // Custom chars from arduino examples
@@ -125,6 +128,10 @@ void lcdCondition();
 // Motor
 void motorStep(int steps, bool inverse);
 
+// Extractor
+void start_ext(int numLine);
+void stop_ext(int numLine);
+
 void setStartCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void setStopCommand(int numSensor, int tempOp, float tempValue, int midOp, int humOp, float humValue);
 void sendCommands();
@@ -161,6 +168,9 @@ void setup() {
   // Step motor
   for(int i=0; i < 4; i++) pinMode(MOTOR_START_PIN + i*2, OUTPUT);
 
+  // Extractor
+  for(int i=0; i < 4; i++) pinMode(MOTOR_EXT_PIN + i, OUTPUT);
+  
   // Sensor / Irrigation outputs
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
     pinMode(IRRIGATION_START_PIN + numSensor, OUTPUT);
@@ -189,8 +199,10 @@ void setup() {
   lines[0].hasGreenHouse = true;
   lines[0].extStartTemp = 25;
   lines[0].extStopTemp = 24;
+  lines[0].extStarted = false;
   lines[0].doorOpenTemp = 24;
   lines[0].doorCloseTemp = 23;
+  lines[0].doorOpened = false;
   
   lines[1].configured = true;
   lines[1].tempStartThr = 23;
@@ -206,6 +218,8 @@ void setup() {
   lines[1].stopMidOp = OP_AND;
 
   lines[1].hasGreenHouse = false;
+  lines[1].doorOpened = false;
+  lines[1].extStarted = false;
   
   for(int numSensor=2; numSensor < NUM_LINES; numSensor++) lines[numSensor].configured = false;
 
@@ -263,7 +277,7 @@ void motorStep(int steps, bool inverse) {
     digitalWrite(MOTOR_START_PIN + 4, (motorStatus & 0x4) != 0);
     digitalWrite(MOTOR_START_PIN + 6, (motorStatus & 0x8) != 0);
 
-    if(motorDir) {
+    if(inverse) {
       motorStatus <<= 1;
       if(motorStatus > 8) motorStatus = 1;
     } else {
@@ -278,6 +292,14 @@ void motorStep(int steps, bool inverse) {
   digitalWrite(MOTOR_START_PIN + 2, 0);
   digitalWrite(MOTOR_START_PIN + 4, 0);
   digitalWrite(MOTOR_START_PIN + 6, 0);
+}
+
+void start_ext(int numLine) {
+  digitalWrite(MOTOR_EXT_PIN + numLine, HIGH);
+}
+
+void stop_ext(int numLine) {
+  digitalWrite(MOTOR_EXT_PIN + numLine, LOW);
 }
 
 // -------------------------------------------------------------
@@ -574,8 +596,6 @@ void lcdGreenhouse() {
   lcd.print("Door: " + (String)(lines[lcdSelectedLine].doorOpenTemp) + " -> " + (String)(lines[lcdSelectedLine].doorCloseTemp));
   lcd.setCursor(0, 2);
   lcd.print("Extr: " + (String)(lines[lcdSelectedLine].extStartTemp) + " -> " + (String)(lines[lcdSelectedLine].extStopTemp));
-  lcd.setCursor(0, 3);
-  lcd.print((String)(lcdOptionOffset));
 }
 
 // -------------------------------------------------------------
@@ -619,14 +639,24 @@ void updateLines() {
     cond1 = checkCondition(currentTemp, lines[numSensor].tempStopOp, lines[numSensor].tempStopThr);
     cond2 = checkCondition(currentHum, lines[numSensor].humStopOp, lines[numSensor].humStopThr);
     if(checkCondition(cond1, lines[numSensor].stopMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
-    //Serial.println("");
-    
-    /*if(currentTemp > lines[numSensor].tempStartThr) {  // Start condition
-      digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
-      
-    } else if(currentTemp < lines[numSensor].tempStopThr) { // Stop condition
-      digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
-    }*/
+
+    if(lines[numSensor].hasGreenHouse) {
+      if(currentTemp >= lines[numSensor].doorOpenTemp && !lines[numSensor].doorOpened) {
+        lines[numSensor].doorOpened = true;
+        motorStep(26, true);
+      } else if(currentTemp <= lines[numSensor].doorCloseTemp && lines[numSensor].doorOpened) {
+        lines[numSensor].doorOpened = false;
+        motorStep(26, false);
+      } else if(currentTemp >= lines[numSensor].extStartTemp && !lines[numSensor].extStarted) {
+        lines[numSensor].extStarted = true;
+        start_ext(numSensor);
+        Serial.println("STARTING EXTRACTOR");
+      } else if(currentTemp <= lines[numSensor].extStopTemp && lines[numSensor].extStarted) {
+        lines[numSensor].extStarted = false;
+        stop_ext(numSensor);
+        Serial.println("STOPING EXTRACTOR");
+      }
+    }
   } 
 }
 
