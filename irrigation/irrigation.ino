@@ -8,7 +8,7 @@ const int SENSOR_TEMP_START_PIN = A2; // NUM_SENSORS from here (temp)
 const int SENSOR_HUM_START_PIN = A8; // NUM_SENSORS from here (temp)
 const int IRRIGATION_START_PIN = 2; // NUM_SENSORS irrigations from here
 const int BUTTONS_START_PIN = 18; // Buttons to handle LCD
-const int MOTOR_START_PIN = 47; // Step motor
+const int MOTOR_START_PIN = 38; // Step motor
 const int MOTOR_EXT_PIN = 34;
 
 const int DEBOUNCE_MILLIS = 200; // Millis to wait in a button interrupt to handle debounce
