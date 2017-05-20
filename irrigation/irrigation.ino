@@ -132,7 +132,7 @@ void lcdMenu();
 void lcdCondition();
 
 // Motor
-void motorStep(int steps, bool inverse);
+void motorStep(int numLine, int steps, bool inverse);
 
 // Extractor
 void start_ext(int numLine);
@@ -290,12 +290,21 @@ void loop() {
 
 // -------------------------------------------------------------
 
-void motorStep(int steps, bool inverse) {
+void motorStep(int numLine, int steps, bool inverse) {
+  int pin;
+
+  switch(numLine){
+    case 0: pin = MOTOR_START_PIN; break;
+    case 1: pin = MOTOR_START_PIN + 1; break;
+    case 2: pin = MOTOR_START_PIN + 8; break;
+    case 3: pin = MOTOR_START_PIN + 9; break;
+  }
+  
   for(int i = 0; i < steps; i++) {
-    digitalWrite(MOTOR_START_PIN, (motorStatus & 0x1) != 0);
-    digitalWrite(MOTOR_START_PIN + 2, (motorStatus & 0x2) != 0);
-    digitalWrite(MOTOR_START_PIN + 4, (motorStatus & 0x4) != 0);
-    digitalWrite(MOTOR_START_PIN + 6, (motorStatus & 0x8) != 0);
+    digitalWrite(pin, (motorStatus & 0x1) != 0);
+    digitalWrite(pin + 2, (motorStatus & 0x2) != 0);
+    digitalWrite(pin + 4, (motorStatus & 0x4) != 0);
+    digitalWrite(pin + 6, (motorStatus & 0x8) != 0);
 
     if(inverse) {
       motorStatus <<= 1;
@@ -308,10 +317,10 @@ void motorStep(int steps, bool inverse) {
     delay(10);
   }
 
-  digitalWrite(MOTOR_START_PIN, 0);
-  digitalWrite(MOTOR_START_PIN + 2, 0);
-  digitalWrite(MOTOR_START_PIN + 4, 0);
-  digitalWrite(MOTOR_START_PIN + 6, 0);
+  digitalWrite(pin, 0);
+  digitalWrite(pin + 2, 0);
+  digitalWrite(pin + 4, 0);
+  digitalWrite(pin + 6, 0);
 }
 
 void start_ext(int numLine) {
@@ -732,10 +741,10 @@ void updateLines() {
     if(lines[numSensor].hasGreenHouse) {
       if(currentTemp >= lines[numSensor].doorOpenTemp && !lines[numSensor].doorOpened) {
         lines[numSensor].doorOpened = true;
-        motorStep(26, true);
+        motorStep(numSensor, 26, true);
       } else if(currentTemp <= lines[numSensor].doorCloseTemp && lines[numSensor].doorOpened) {
         lines[numSensor].doorOpened = false;
-        motorStep(26, false);
+        motorStep(numSensor, 26, false);
       } else if(currentTemp >= lines[numSensor].extStartTemp && !lines[numSensor].extStarted) {
         lines[numSensor].extStarted = true;
         start_ext(numSensor);
