@@ -214,7 +214,7 @@ void setup() {
   lines[0].tempStopOp = OP_LESS;
   lines[0].humStopThr = 50;
   lines[0].humStopOp = OP_LESS;
-  lines[0].stopMidOp = OP_OR;
+  lines[0].stopMidOp = OP_AND;
 
   lines[0].hasGreenHouse = true;
   lines[0].extStartTemp = 25;
@@ -377,9 +377,9 @@ void btnDown() {
       if(lcdMenuIndex2 == 0) {
         if(lcdOptionOffset == 1) {
           if(lcdStartCondition) {
-            lines[lcdSelectedLine].tempStartOp = lines[lcdSelectedLine].tempStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].tempStartOp = (lines[lcdSelectedLine].tempStartOp - 1); if(lines[lcdSelectedLine].tempStartOp < 0) lines[lcdSelectedLine].tempStartOp = 2; 
           } else {
-            lines[lcdSelectedLine].tempStopOp = lines[lcdSelectedLine].tempStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].tempStopOp = (lines[lcdSelectedLine].tempStopOp - 1); if(lines[lcdSelectedLine].tempStopOp < 0) lines[lcdSelectedLine].tempStopOp = 2; 
           }
         } if(lcdOptionOffset == 2) {
           if(lcdStartCondition) {
@@ -391,9 +391,9 @@ void btnDown() {
       } else { // lcdMenuIndex == 1
         if(lcdOptionOffset == 1) {
           if(lcdStartCondition) {
-            lines[lcdSelectedLine].humStartOp = lines[lcdSelectedLine].humStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].humStartOp = (lines[lcdSelectedLine].humStartOp - 1); if(lines[lcdSelectedLine].humStartOp < 0) lines[lcdSelectedLine].humStartOp = 2;
           } else {
-            lines[lcdSelectedLine].humStopOp = lines[lcdSelectedLine].humStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].humStopOp = (lines[lcdSelectedLine].humStopOp - 1); if(lines[lcdSelectedLine].humStopOp < 0) lines[lcdSelectedLine].humStopOp = 2;
           }
         } if(lcdOptionOffset == 2) {
           if(lcdStartCondition) {
@@ -459,9 +459,9 @@ void btnUp() {
       if(lcdMenuIndex2 == 0) {
         if(lcdOptionOffset == 1) {
           if(lcdStartCondition) {
-            lines[lcdSelectedLine].tempStartOp = lines[lcdSelectedLine].tempStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].tempStartOp = (lines[lcdSelectedLine].tempStartOp + 1) % 3; 
           } else {
-            lines[lcdSelectedLine].tempStopOp = lines[lcdSelectedLine].tempStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].tempStopOp = (lines[lcdSelectedLine].tempStopOp + 1) % 3; 
           }
         } if(lcdOptionOffset == 2) {
           if(lcdStartCondition) {
@@ -473,9 +473,9 @@ void btnUp() {
       } else { // lcdMenuIndex == 1
         if(lcdOptionOffset == 1) {
           if(lcdStartCondition) {
-            lines[lcdSelectedLine].humStartOp = lines[lcdSelectedLine].humStartOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].humStartOp = (lines[lcdSelectedLine].humStartOp + 1) % 3; 
           } else {
-            lines[lcdSelectedLine].humStopOp = lines[lcdSelectedLine].humStopOp == OP_LESS ? OP_GREATER: OP_LESS;
+            lines[lcdSelectedLine].humStopOp = (lines[lcdSelectedLine].humStopOp + 1) % 3; 
           }
         } if(lcdOptionOffset == 2) {
           if(lcdStartCondition) {
@@ -631,9 +631,21 @@ void lcdCondition() {
   }
 
   lcd.setCursor(0, 1);
-  lcd.print("TEMP:   " + (String)(tempOp == OP_LESS ? "<" : ">") + " " + (String) temp + "C");
+  if(tempOp == OP_LESS) {
+    lcd.print("TEMP:   < " + (String) temp + "C");
+  } else if(tempOp == OP_GREATER) {
+    lcd.print("TEMP:   > " + (String) temp + "C");
+  } else {
+    lcd.print("TEMP:   ! " + (String) temp + "C");
+  }
   lcd.setCursor(0, 2);
-  lcd.print("HUM :   " + (String)(humOp == OP_LESS ? "<" : ">") + " " + (String) hum + "%");
+  if(humOp == OP_LESS) {
+    lcd.print("HUM:    < " + (String) hum + "%");
+  } else if(humOp == OP_GREATER) {
+    lcd.print("HUM:    > " + (String) hum + "%");
+  } else {
+    lcd.print("HUM:    ! " + (String) hum + "%");
+  }
 }
 
 void lcdGreenhouse() {
@@ -665,7 +677,7 @@ float readHum(int sensor) {
 // Check if the lines accomplish the conditions to start/stop
 void updateLines() {
   float currentTemp, currentHum;
-  bool cond1, cond2;
+  bool cond1, cond2, allNone;
   
   // Check conditions
   for(int numSensor=0; numSensor < NUM_LINES; numSensor++) {
@@ -681,12 +693,14 @@ void updateLines() {
     //Serial.println("Line (" + (String) numSensor + "):");
     cond1 = checkCondition(currentTemp, lines[numSensor].tempStartOp, lines[numSensor].tempStartThr);
     cond2 = checkCondition(currentHum, lines[numSensor].humStartOp, lines[numSensor].humStartThr);
-    if(checkCondition(cond1, lines[numSensor].startMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
+    allNone = lines[numSensor].startMidOp == OP_NONE && lines[numSensor].humStartOp == OP_NONE;
+    if(!allNone && checkCondition(cond1, lines[numSensor].startMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, HIGH);
 
     // Stop condition
     cond1 = checkCondition(currentTemp, lines[numSensor].tempStopOp, lines[numSensor].tempStopThr);
     cond2 = checkCondition(currentHum, lines[numSensor].humStopOp, lines[numSensor].humStopThr);
-    if(checkCondition(cond1, lines[numSensor].stopMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
+    allNone = lines[numSensor].tempStopOp == OP_NONE && lines[numSensor].humStopOp == OP_NONE;
+    if(!allNone && checkCondition(cond1, lines[numSensor].stopMidOp, cond2)) digitalWrite(IRRIGATION_START_PIN + numSensor, LOW);
 
     if(lines[numSensor].hasGreenHouse) {
       if(currentTemp >= lines[numSensor].doorOpenTemp && !lines[numSensor].doorOpened) {
@@ -709,8 +723,8 @@ void updateLines() {
 }
 
 bool checkCondition(float value, int op, float value2) {
-  //Serial.println("cond " + (String) value + ", " + (String) op + ", " + (String) value2 + " -> " + (String) ((op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2)));
-  return (op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2);
+  Serial.println("cond " + (String) value + ", " + (String) op + ", " + (String) value2 + " -> " + (String) ((op == OP_NONE) || (op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2)));
+  return (op == OP_NONE) || (op == OP_LESS && value < value2) || (op == OP_GREATER && value > value2);
 }
 
 bool checkCondition(bool value, int op, bool value2) {
