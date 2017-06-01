@@ -87,7 +87,7 @@ class Condition:
 			
 	def encode(self, delimiter = ";"):
 		return "%d%s%.2f%s%d%s%d%s%.2f" % (self.temp_op, delimiter, self.temp_thr, delimiter, \
-											 self.mid_op, delimiter, self.hum_op, delimiter, self.hum_thr)
+											 3 if self.mid_op == Condition.OPERATORS["none"] else self.mid_op, delimiter, self.hum_op, delimiter, self.hum_thr)
 
 class IrrigationSystem:
 
